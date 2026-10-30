@@ -1,0 +1,29 @@
+{
+  "name": "racik-media-v3",
+  "version": "1.0.0",
+  "description": "Racik Media V3 — Platform hibrida Knowledge + Community + Commerce + Services",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "api:dev": "pnpm --filter @racik-media/api start:dev",
+    "api:build": "pnpm --filter @racik-media/api build",
+    "web:dev": "pnpm --filter @racik-media/web dev",
+    "web:build": "pnpm --filter @racik-media/web build",
+    "dev": "concurrently \"pnpm api:dev\" \"pnpm web:dev\"",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --filter @racik-media/api test",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

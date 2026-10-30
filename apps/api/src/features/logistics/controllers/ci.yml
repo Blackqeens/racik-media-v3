@@ -1,0 +1,49 @@
+name: Racik Media V3 — CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  validate-and-typecheck:
+    name: Lint & Typecheck API + Web
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # ─── 1. Check API Backend ──────────────────────────────────
+      - name: Install API Dependencies
+        working-directory: architecture new/files/apps/api
+        run: npm ci
+
+      - name: Typecheck API
+        working-directory: architecture new/files/apps/api
+        run: npx tsc --noEmit
+
+      # ─── 2. Check Web Frontend ─────────────────────────────────
+      - name: Install Web Dependencies
+        working-directory: architecture new/files/apps/web
+        run: npm ci
+
+      - name: Typecheck Web
+        working-directory: architecture new/files/apps/web
+        run: npx tsc --noEmit
+
+      - name: Build Web Standalone
+        working-directory: architecture new/files/apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+          NEXT_PUBLIC_SUPABASE_URL: https://bpppiqblcbhqytppahrq.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_anon_key_for_build
+        run: npm run build
+        
