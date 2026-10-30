@@ -21,6 +21,7 @@ export const AppConfigSchema = z.object({
   APP_VERSION: z.string().default('1.0.0'),
 
   // ─── API Server ──────────────────────────────────────────────────────
+  PORT: z.coerce.number().optional(),
   API_PORT: z.coerce.number().default(3001),
   API_HOST: z.string().default('0.0.0.0'),
   API_PREFIX: z.string().default('/api/v1'),

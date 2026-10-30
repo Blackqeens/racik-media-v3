@@ -28,7 +28,7 @@ async function bootstrap() {
   );
 
   const config = app.get(ConfigService);
-  const port = config.get<number>('API_PORT', 3001);
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : config.get<number>('API_PORT', 3001);
   const host = config.get<string>('API_HOST', '0.0.0.0');
   const prefix = config.get<string>('API_PREFIX', '/api/v1');
   const corsOrigins = config
@@ -36,8 +36,10 @@ async function bootstrap() {
     .split(',')
     .map((o) => o.trim());
 
-  // Prefix global semua endpoint: /api/v1/...
-  app.setGlobalPrefix(prefix);
+  // Prefix global semua endpoint: /api/v1/... (kecualikan root '/' agar health check container tembus)
+  app.setGlobalPrefix(prefix, {
+    exclude: ['/'],
+  });
 
   // CORS — hanya izinkan domain yang ada di env
   app.enableCors({
