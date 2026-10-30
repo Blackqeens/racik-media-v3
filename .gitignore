@@ -26,11 +26,13 @@ node_modules/
 .pnp.js
 
 # --- Build Output -------------------------------------------------------------
-dist/
+/dist/
 build/
 .next/
 out/
-apps/api/dist/
+# apps/api/dist/ (committed to guarantee cloud container zero-failure launch)
+!apps/api/dist
+!apps/api/dist/**
 apps/web/.next/
 apps/web/out/
 
