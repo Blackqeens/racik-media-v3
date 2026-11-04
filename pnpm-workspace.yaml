@@ -2,7 +2,7 @@ packages:
   - apps/api
   - apps/web
 allowBuilds:
-  '@nestjs/core': set this to true or false
-  unrs-resolver: set this to true or false
+  '@nestjs/core': false
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - lucide-react@1.64.0
