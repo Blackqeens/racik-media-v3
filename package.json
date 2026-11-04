@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Racik Media V3 — Platform hibrida Knowledge + Community + Commerce + Services",
   "private": true,
+  "packageManager": "pnpm@10.15.1",
   "workspaces": [
     "apps/api",
     "apps/web"
