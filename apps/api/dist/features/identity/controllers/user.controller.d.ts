@@ -68,6 +68,14 @@ export declare class UserController {
         statusCode: HttpStatus;
         data: {
             total: number;
+            items: {
+                id: any;
+                title: any;
+                status: any;
+                content_type: any;
+                created_at: any;
+                updated_at: any;
+            }[];
         };
     }>;
 }

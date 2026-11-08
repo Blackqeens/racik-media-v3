@@ -8,7 +8,7 @@ import type { SetAllCookies } from '@supabase/ssr';
  *
  * Aturan akses (sesuai permission-matrix.md):
  *   /dashboard/*        → wajib login (semua role)
- *   /seller/*           → wajib login + role seller/vendor aktif
+ *   /seller/*           → wajib login + role seller aktif
  *   /admin/*            → wajib login + role admin/moderator aktif
  *   /login, /register   → redirect ke /dashboard jika sudah login
  *
@@ -16,9 +16,19 @@ import type { SetAllCookies } from '@supabase/ssr';
  */
 
 // Route yang memerlukan autentikasi (paling tidak harus login)
-const AUTH_REQUIRED = ['/dashboard', '/profile', '/bookmarks', '/orders', '/checkout'];
+const AUTH_REQUIRED = [
+  '/dashboard',
+  '/profile',
+  '/bookmarks',
+  '/orders',
+  '/checkout',
+  '/articles/write',
+  '/author',
+  '/distributor',
+  '/service-provider',
+];
 
-// Route yang memerlukan role seller atau vendor
+// Route yang memerlukan role seller
 const SELLER_ROUTES = ['/seller/dashboard', '/seller/products', '/seller/orders', '/seller/reports'];
 
 // Route yang memerlukan role admin atau moderator
@@ -27,6 +37,15 @@ const ADMIN_ROUTES = [
   '/admin/moderation',
   '/admin/seller-verification',
   '/admin/financial-report',
+];
+
+const AUTHOR_ROUTES = ['/author/dashboard', '/author/articles', '/author/drafts'];
+const DISTRIBUTOR_ROUTES = ['/distributor/dashboard', '/distributor/coverage', '/distributor/orders', '/distributor/reports'];
+const SERVICE_PROVIDER_ROUTES = [
+  '/service-provider/dashboard',
+  '/service-provider/services',
+  '/service-provider/orders',
+  '/service-provider/reports',
 ];
 
 // Route yang hanya bisa diakses kalau BELUM login (redirect ke dashboard jika sudah login)
@@ -43,7 +62,8 @@ export async function middleware(request: NextRequest) {
   // Buat server-side Supabase client (baca session dari cookie)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
@@ -78,7 +98,10 @@ export async function middleware(request: NextRequest) {
   const needsAuth =
     AUTH_REQUIRED.some((p) => pathname.startsWith(p)) ||
     SELLER_ROUTES.some((p) => pathname.startsWith(p)) ||
-    ADMIN_ROUTES.some((p) => pathname.startsWith(p));
+    ADMIN_ROUTES.some((p) => pathname.startsWith(p)) ||
+    AUTHOR_ROUTES.some((p) => pathname.startsWith(p)) ||
+    DISTRIBUTOR_ROUTES.some((p) => pathname.startsWith(p)) ||
+    SERVICE_PROVIDER_ROUTES.some((p) => pathname.startsWith(p));
 
   if (needsAuth && !isLoggedIn) {
     const loginUrl = new URL('/login', request.url);
@@ -92,7 +115,7 @@ export async function middleware(request: NextRequest) {
       .from('user_roles')
       .select('role_type, status')
       .eq('user_id', session.user.id)
-      .in('role_type', ['seller', 'vendor'])
+      .in('role_type', ['seller'])
       .eq('status', 'active');
 
     if (!roles || roles.length === 0) {
@@ -101,17 +124,78 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 4. Role check untuk admin/moderator routes ────────────────────────────
-  if (isLoggedIn && ADMIN_ROUTES.some((p) => pathname.startsWith(p))) {
+  // ── 4. Role check untuk author routes ────────────────────────────────────
+  if (isLoggedIn && AUTHOR_ROUTES.some((p) => pathname.startsWith(p))) {
     const { data: roles } = await supabase
       .from('user_roles')
       .select('role_type, status')
       .eq('user_id', session.user.id)
-      .in('role_type', ['admin', 'master_admin', 'moderator'])
+      .eq('role_type', 'author')
       .eq('status', 'active');
 
     if (!roles || roles.length === 0) {
-      // Tidak punya akses — redirect ke dashboard biasa
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // ── 5. Role check untuk distributor routes ───────────────────────────────
+  if (isLoggedIn && DISTRIBUTOR_ROUTES.some((p) => pathname.startsWith(p))) {
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role_type, status')
+      .eq('user_id', session.user.id)
+      .eq('role_type', 'distributor')
+      .eq('status', 'active');
+
+    if (!roles || roles.length === 0) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // ── 6. Role check untuk service-provider routes ──────────────────────────
+  if (isLoggedIn && SERVICE_PROVIDER_ROUTES.some((p) => pathname.startsWith(p))) {
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role_type, status')
+      .eq('user_id', session.user.id)
+      .eq('role_type', 'service_provider')
+      .eq('status', 'active');
+
+    if (!roles || roles.length === 0) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // ── 7. Role check untuk admin/moderator routes ────────────────────────────
+  if (
+    isLoggedIn &&
+    (pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/moderation'))
+  ) {
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role_type, status')
+      .eq('user_id', session.user.id)
+      .in('role_type', ['admin', 'moderator'])
+      .eq('status', 'active');
+
+    if (!roles || roles.length === 0) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  // Verifikasi seller dan laporan keuangan hanya untuk admin
+  if (
+    isLoggedIn &&
+    (pathname.startsWith('/admin/seller-verification') || pathname.startsWith('/admin/financial-report'))
+  ) {
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role_type, status')
+      .eq('user_id', session.user.id)
+      .eq('role_type', 'admin')
+      .eq('status', 'active');
+
+    if (!roles || roles.length === 0) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }

@@ -26,6 +26,15 @@ interface RecentOrder {
   created_at: string;
 }
 
+interface ContentItem {
+  id: string;
+  title: string;
+  status: string;
+  content_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
 function StatCard({ label, value, href }: { label: string; value: string | number; href?: string }) {
   const content = (
     <div className="card text-center hover:border-primary-300 transition">
@@ -62,7 +71,7 @@ export default function DashboardPage() {
     queryKey: ['dashboard-content'],
     enabled: !!session,
     queryFn: () =>
-      apiClient.get<{ total: number }>('/users/me/content?limit=1', {
+      apiClient.get<{ total: number; items: ContentItem[] }>('/users/me/content?limit=5', {
         Authorization: `Bearer ${session!.access_token}`,
       }),
   });
@@ -71,6 +80,7 @@ export default function DashboardPage() {
   const reputationScore = reputationData?.data?.master_score ?? 0;
   const contentCount  = contentData?.data?.total ?? 0;
   const recentOrders  = ordersData?.data?.items ?? [];
+  const recentContent = contentData?.data?.items ?? [];
   const isLoading     = loadingOrders || loadingReputation || loadingContent;
 
   return (
@@ -93,6 +103,46 @@ export default function DashboardPage() {
           label="Poin Reputasi"
           value={isLoading ? '…' : Math.round(reputationScore)}
         />
+      </div>
+
+      {/* ── Artikel Saya ─────────────────────────────────────────── */}
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">Artikel Saya</h2>
+          <Link href="/articles/write" className="text-xs text-primary-600 hover:underline">
+            Buat artikel →
+          </Link>
+        </div>
+
+        {loadingContent ? (
+          <div className="h-10 bg-gray-100 rounded animate-pulse" />
+        ) : recentContent.length === 0 ? (
+          <p className="text-sm text-gray-400">Belum ada artikel yang dibuat.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {recentContent.map((article) => (
+              <Link key={article.id} href={`/articles/write?draft=${article.id}`} className="flex items-center justify-between py-3 text-sm hover:bg-gray-50">
+                <div className="min-w-0 pr-3">
+                  <p className="truncate font-medium text-gray-800">{article.title}</p>
+                  <p className="text-xs text-gray-400">{formatRelativeTime(article.updated_at)}</p>
+                </div>
+                <span className={`shrink-0 text-xs px-2 py-1 rounded-full font-medium ${
+                  article.status === 'published' || article.status === 'approved'
+                    ? 'bg-green-100 text-green-700'
+                    : article.status === 'under_review'
+                      ? 'bg-amber-100 text-amber-700'
+                      : article.status === 'revision_requested'
+                        ? 'bg-blue-100 text-blue-700'
+                        : article.status === 'rejected'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {article.status.replace(/_/g, ' ')}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Pesanan Terbaru ────────────────────────────────────────── */}

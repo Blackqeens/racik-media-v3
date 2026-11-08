@@ -82,15 +82,21 @@ let UserController = class UserController {
         };
     }
     async getMyContent(req, pagination) {
-        const userId = req.user.userId;
+        const userId = req.user?.id || req.user?.userId || req.user?.sub;
         const limit = pagination?.limit ? Number(pagination.limit) : 1;
-        const { count, error } = await this.supabase
+        const query = this.supabase
             .from('content_items')
-            .select('id', { count: 'exact', head: true })
-            .eq('author_id', userId);
+            .select('id, title, status, content_type, created_at, updated_at', { count: 'exact' })
+            .eq('author_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(limit);
+        const { data, count, error } = await query;
         return {
             statusCode: common_1.HttpStatus.OK,
-            data: { total: error ? 0 : (count || 0) },
+            data: {
+                total: error ? 0 : (count || 0),
+                items: error ? [] : (data || []),
+            },
         };
     }
 };

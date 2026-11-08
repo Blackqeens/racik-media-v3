@@ -29,6 +29,7 @@ export class ContentService {
       tenant_id: tenantId || '00000000-0000-0000-0000-000000000001',
       author_id: userId,
       status: 'draft',
+      content_type: anyDto.content_type || 'article',
       title: anyDto.title,
       slug: anyDto.slug || anyDto.title?.toLowerCase().replace(/\s+/g, '-'),
       excerpt: anyDto.excerpt || anyDto.summary,
@@ -141,7 +142,13 @@ export class ContentService {
    * 4. updateContent (PATCH /api/v1/content/:id)
    */
   async updateContent(id: string, userId: string, dto: UpdateContentDto) {
-    await this.getById(id);
+    const item = await this.getById(id);
+    if ((item as any).author_id !== userId) {
+      throw new NotFoundException('Konten tidak ditemukan atau bukan milik pengguna ini');
+    }
+    if (!['draft', 'revision_requested'].includes((item as any).status)) {
+      throw new InternalServerErrorException('Konten yang sedang ditinjau tidak dapat diedit');
+    }
 
     const updatePayload = {
       ...(dto as any),
@@ -166,12 +173,18 @@ export class ContentService {
    * 5. submitForReview (POST /api/v1/content/:id/submit)
    */
   async submitForReview(id: string, userId: string, tenantId: string) {
-    await this.getById(id);
+    const item = await this.getById(id);
+    if ((item as any).author_id !== userId) {
+      throw new NotFoundException('Konten tidak ditemukan atau bukan milik pengguna ini');
+    }
+    if (!['draft', 'revision_requested'].includes((item as any).status)) {
+      throw new InternalServerErrorException('Konten hanya dapat diajukan dari status draft atau revisi');
+    }
 
     const { data, error } = await this.supabase
       .from('content_items')
       .update({
-        status: 'pending_review',
+        status: 'under_review',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -181,6 +194,42 @@ export class ContentService {
     if (error) {
       throw new InternalServerErrorException(`Gagal mengajukan review konten: ${error.message}`);
     }
+
+    const effectiveTenantId = tenantId || (item as any).tenant_id;
+    const { data: existingTicket } = await this.supabase
+      .from('moderation_tickets')
+      .select('id')
+      .eq('entity_type', 'content_item')
+      .eq('entity_id', id)
+      .in('status', ['pending', 'assigned', 'under_panel_review'])
+      .maybeSingle();
+
+    if (!existingTicket) {
+      const { error: ticketError } = await this.supabase
+        .from('moderation_tickets')
+        .insert({
+          tenant_id: effectiveTenantId,
+          entity_type: 'content_item',
+          entity_id: id,
+          queue_type: 'knowledge_queue',
+          severity: 'standard',
+          status: 'pending',
+          sla_deadline: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        });
+
+      if (ticketError) {
+        throw new InternalServerErrorException(`Konten masuk review tetapi tiket gagal dibuat: ${ticketError.message}`);
+      }
+    }
+
+    await this.supabase.from('content_lifecycle_logs').insert({
+      tenant_id: effectiveTenantId,
+      content_id: id,
+      actor_id: userId,
+      old_state: (item as any).status,
+      new_state: 'under_review',
+      rationale_notes: 'Artikel diajukan oleh penulis untuk kurasi moderator',
+    });
 
     return data;
   }

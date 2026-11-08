@@ -1,4 +1,5 @@
 import type { ApiResponse } from '@/types/api.types';
+import { supabase } from '@/lib/supabase';
 
 /**
  * api-client.ts — Axios-based API client for NestJS backend.
@@ -8,9 +9,19 @@ import type { ApiResponse } from '@/types/api.types';
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const headers = new Headers(init.headers);
+
+  if (!headers.has('Authorization') && session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+  headers.set('Content-Type', 'application/json');
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init.headers },
     ...init,
+    headers,
   });
 
   const json = await res.json();

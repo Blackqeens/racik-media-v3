@@ -42,8 +42,38 @@ export class TicketService {
 
   async recordDecision(ticketId: string, moderatorId: string, decision: string, reasonCode: string, tenantId: string): Promise<void> {
     const ticket = await this.getTicketById(ticketId);
-    const newStatus = decision === 'approve' || decision === 'approved' ? 'approved' : 'rejected';
+    const normalizedDecision = decision.toLowerCase();
+    const newStatus =
+      normalizedDecision === 'approve' || normalizedDecision === 'approved'
+        ? 'approved'
+        : normalizedDecision === 'revision_requested' || normalizedDecision === 'revision'
+          ? 'revision_requested'
+          : 'rejected';
     await this.supabase.admin.from('moderation_tickets').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', ticketId);
+    if (ticket.entity_type === 'content_item') {
+      const contentStatus =
+        newStatus === 'approved'
+          ? 'approved'
+          : newStatus === 'revision_requested'
+            ? 'revision_requested'
+            : 'rejected';
+      await this.supabase.admin
+        .from('content_items')
+        .update({
+          status: contentStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ticket.entity_id);
+
+      await this.supabase.admin.from('content_lifecycle_logs').insert({
+        tenant_id: tenantId,
+        content_id: ticket.entity_id,
+        actor_id: moderatorId,
+        old_state: 'under_review',
+        new_state: contentStatus,
+        rationale_notes: reasonCode,
+      });
+    }
     await this.eventBus.publish({
       event_name: 'moderation.decision_made', tenant_id: tenantId, schema_version: 1,
       payload: { ticketId, entityType: ticket.entity_type, entityId: ticket.entity_id, decision, reasonCode },

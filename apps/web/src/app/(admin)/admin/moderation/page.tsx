@@ -163,6 +163,19 @@ export default function ModerationPage() {
                   onClick={() =>
                     decideMutation.mutate({
                       ticketId: t.id,
+                      decision: 'revision_requested',
+                      reasonCode: 'needs_revision',
+                    })
+                  }
+                  disabled={decideMutation.isPending}
+                  className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold flex items-center gap-1 transition"
+                >
+                  <RotateCw className="w-3.5 h-3.5" /> Revisi
+                </button>
+                <button
+                  onClick={() =>
+                    decideMutation.mutate({
+                      ticketId: t.id,
                       decision: 'rejected',
                       reasonCode: 'guideline_violation',
                     })
