@@ -54,6 +54,18 @@ const GUEST_ONLY = ['/login', '/register', '/forgot-password'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // DEVELOPMENT ONLY: bypass route auth while working on dashboard UI.
+  // Production (NODE_ENV=production) must always keep the auth guards below.
+  const authDisabledForDevelopment =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  if (authDisabledForDevelopment) {
+    return NextResponse.next({
+      request: { headers: request.headers },
+    });
+  }
+
   // Buat response mutable agar Supabase SSR bisa refresh cookies
   const response = NextResponse.next({
     request: { headers: request.headers },
