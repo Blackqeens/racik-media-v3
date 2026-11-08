@@ -65,8 +65,14 @@ export default function LoginPage() {
       }
 
       if (data?.session) {
-        // Berhasil login, arahkan ke dashboard
-        router.push('/dashboard');
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          setErrorMessage('Sesi login belum tersimpan. Silakan coba masuk kembali.');
+          setIsLoading(false);
+          return;
+        }
+
+        router.replace('/dashboard');
         router.refresh();
       }
     } catch (err: any) {
