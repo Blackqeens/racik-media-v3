@@ -48,6 +48,7 @@ export default function RegisterPage() {
         email: values.email,
         password: values.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             full_name: values.fullName,
           },
@@ -60,12 +61,15 @@ export default function RegisterPage() {
         return;
       }
 
-      if (data?.user) {
+      if (data?.session) {
         setSuccessMessage('Akun berhasil dibuat! Mengalihkan ke dashboard...');
         setTimeout(() => {
           router.push('/dashboard');
           router.refresh();
         }, 1500);
+      } else if (data?.user) {
+        setSuccessMessage('Akun dibuat. Konfirmasi email terlebih dahulu melalui link yang dikirim, lalu masuk kembali.');
+        setIsLoading(false);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Terjadi kesalahan sistem saat pendaftaran');

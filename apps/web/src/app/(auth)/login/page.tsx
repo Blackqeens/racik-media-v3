@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   const {
     register,
@@ -34,6 +36,8 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
     setErrorMessage(null);
+    setUnconfirmedEmail(null);
+    setConfirmationSent(false);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -42,11 +46,20 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setErrorMessage(
-          error.message === 'Invalid login credentials'
-            ? 'Email atau password salah'
-            : error.message
-        );
+        const confirmationRequired =
+          error.message.toLowerCase().includes('email not confirmed') ||
+          error.message.toLowerCase().includes('confirm signup');
+
+        if (confirmationRequired) {
+          setUnconfirmedEmail(values.email.trim());
+          setErrorMessage('Email belum dikonfirmasi. Buka email konfirmasi atau kirim ulang link.');
+        } else {
+          setErrorMessage(
+            error.message === 'Invalid login credentials'
+              ? 'Email atau password salah'
+              : error.message
+          );
+        }
         setIsLoading(false);
         return;
       }
@@ -61,6 +74,25 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  async function resendConfirmation() {
+    if (!unconfirmedEmail) return;
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: unconfirmedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setConfirmationSent(true);
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -85,6 +117,16 @@ export default function LoginPage() {
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
+        )}
+        {unconfirmedEmail && (
+          <button
+            type="button"
+            onClick={resendConfirmation}
+            disabled={confirmationSent}
+            className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 disabled:opacity-60"
+          >
+            {confirmationSent ? 'Link konfirmasi sudah dikirim' : 'Kirim ulang email konfirmasi'}
+          </button>
         )}
 
         {/* Form Input */}
