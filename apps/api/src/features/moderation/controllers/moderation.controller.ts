@@ -5,12 +5,15 @@
  */
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../core/auth/jwt.guard';
+import { Roles } from '../../../core/auth/roles.decorator';
+import { RolesGuard } from '../../../core/auth/roles.guard';
 import { TicketService } from '../services/ticket.service';
 import { ApiResponse } from '../../../core/shared/dto/api-response.dto';
 import { PaginationDto } from '../../../core/shared/dto/pagination.dto';
 
 @Controller('moderation')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('moderator')
 export class ModerationController {
   constructor(private readonly ticketService: TicketService) {}
 

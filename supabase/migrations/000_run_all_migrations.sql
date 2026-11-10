@@ -103,8 +103,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
     user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     role_type   VARCHAR(50) NOT NULL
                     CHECK (role_type IN (
-                        'member', 'author', 'seller', 'distributor',
-                        'service_provider', 'moderator', 'admin'
+                        'member', 'seller', 'distributor', 'service_provider',
+                        'moderator', 'admin', 'master_admin'
                     )),
     status      VARCHAR(50) NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active', 'under_review', 'suspended')),
@@ -1011,7 +1011,7 @@ CREATE TABLE IF NOT EXISTS security_audit_logs (
                         CHECK (action_type IN (
                             'incident_detected', 'session_invalidated', 'account_locked',
                             'ip_blocked', 'admin_mitigated', 'mfa_breach_attempt',
-                            'sybil_quarantined', 'aml_hold_triggered'
+                            'sybil_quarantined', 'aml_hold_triggered', 'role_override_used'
                         )),
     metadata        JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()

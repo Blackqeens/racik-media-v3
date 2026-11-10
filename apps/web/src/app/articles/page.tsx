@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { apiClient } from '@/lib/api-client';
 import { ArticleCard } from '@/components/articles/ArticleCard';
+import { demoArticles } from '@/lib/demo-data';
 
 /**
  * Articles listing page — fetch konten published dari API.
@@ -38,7 +39,7 @@ export default function ArticlesPage() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['articles', debouncedSearch, contentType, page],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams({
         limit: String(limit),
         page: String(page),
@@ -46,14 +47,39 @@ export default function ArticlesPage() {
         ...(debouncedSearch && { q: debouncedSearch }),
         ...(contentType && { content_type: contentType }),
       });
-      return apiClient.get<ContentItem[]>(`/content?${params}`);
+      try {
+        const response = await apiClient.get<ContentItem[]>(`/content?${params}`);
+        return {
+          items: response.data,
+          total: response.meta?.total ?? 0,
+          totalPages: response.meta?.total_pages ?? 1,
+          isDemo: false,
+        };
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'development') throw error;
+
+        const filtered = demoArticles.filter((item) => {
+          const matchesType = !contentType || item.content_type === contentType;
+          const matchesSearch =
+            !debouncedSearch ||
+            `${item.title} ${item.body}`.toLowerCase().includes(debouncedSearch.toLowerCase());
+          return matchesType && matchesSearch;
+        });
+        const start = (page - 1) * limit;
+        return {
+          items: filtered.slice(start, start + limit),
+          total: filtered.length,
+          totalPages: Math.max(1, Math.ceil(filtered.length / limit)),
+          isDemo: true,
+        };
+      }
     },
     staleTime: 30_000,
   });
 
-  const items = data?.data ?? [];
-  const total = data?.meta?.total ?? 0;
-  const totalPages = data?.meta?.total_pages ?? Math.ceil(total / limit);
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
@@ -79,6 +105,12 @@ export default function ArticlesPage() {
           </select>
         </div>
       </div>
+
+      {data?.isDemo && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Artikel pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+        </p>
+      )}
 
       {/* Loading skeleton */}
       {isLoading && (

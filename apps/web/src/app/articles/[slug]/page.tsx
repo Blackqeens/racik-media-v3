@@ -1,10 +1,11 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { formatRelativeTime } from '@/lib/utils';
+import { demoArticles } from '@/lib/demo-data';
 
 /**
  * Article detail page — konten nyata dari API.
@@ -24,16 +25,25 @@ interface ArticleDetail {
   updated_at: string;
 }
 
-export default function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+export default function ArticleDetailPage() {
+  const { slug } = useParams<{ slug: string }>();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['article', slug],
-    queryFn: () => apiClient.get<ArticleDetail>(`/content/${slug}`),
+    queryFn: async () => {
+      try {
+        const response = await apiClient.get<ArticleDetail>(`/content/${slug}`);
+        return { article: response.data, isDemo: false };
+      } catch (error) {
+        const article = demoArticles.find((item) => item.id === slug);
+        if (process.env.NODE_ENV !== 'development' || !article) throw error;
+        return { article: article as ArticleDetail, isDemo: true };
+      }
+    },
     staleTime: 60_000,
   });
 
-  const article = data?.data;
+  const article = data?.article;
 
   if (isLoading) {
     return (
@@ -68,6 +78,12 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
       <Link href="/articles" className="text-xs text-primary-600 hover:underline">
         ← Artikel
       </Link>
+
+      {data?.isDemo && (
+        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Artikel pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+        </p>
+      )}
 
       {/* Meta */}
       <p className="text-xs text-gray-400 uppercase tracking-wide mt-4 mb-2">

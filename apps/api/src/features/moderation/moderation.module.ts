@@ -2,6 +2,7 @@
  * moderation.module.ts — Moderation Domain Module
  */
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../../core/auth/auth.module';
 import { DatabaseModule } from '../../core/database/database.module';
 import { EventBusModule } from '../../core/events/event-bus.module';
 import { ModerationController } from './controllers/moderation.controller';
@@ -10,7 +11,7 @@ import { PanelService } from './services/panel.service';
 import { ModerationRepository } from './repositories/moderation.repository';
 
 @Module({
-  imports: [DatabaseModule, EventBusModule],
+  imports: [AuthModule, DatabaseModule, EventBusModule],
   controllers: [ModerationController],
   providers: [TicketService, PanelService, ModerationRepository],
   exports: [TicketService, PanelService],

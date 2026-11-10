@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
 import { formatRupiah, formatRelativeTime } from '@/lib/utils';
 import { Package, Clock, CheckCircle2, ChevronRight, ShoppingBag } from 'lucide-react';
+import { demoOrders } from '@/lib/demo-data';
 
 interface OrderItem {
   id: string;
@@ -19,7 +20,7 @@ interface OrderItem {
 export default function OrdersPage() {
   const { session } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['my-orders'],
     enabled: !!session,
     queryFn: () =>
@@ -28,7 +29,8 @@ export default function OrdersPage() {
       }),
   });
 
-  const orders = data?.data?.items ?? [];
+  const isDemo = process.env.NODE_ENV === 'development' && (!session || isError);
+  const orders = isDemo ? demoOrders : data?.data?.items ?? [];
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto py-6">
@@ -43,6 +45,12 @@ export default function OrdersPage() {
           Belanja Lagi
         </Link>
       </div>
+
+      {isDemo && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Pesanan pratinjau lokal karena API belum tersedia. Ini bukan transaksi atau pembayaran sungguhan.
+        </p>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -64,8 +72,9 @@ export default function OrdersPage() {
       ) : (
         <div className="space-y-3">
           {orders.map((order) => (
-            <div
+            <Link
               key={order.id}
+              href={`/orders/${order.id}`}
               className="card flex items-center justify-between p-4 hover:border-emerald-300 transition"
             >
               <div className="flex items-center gap-3">
@@ -100,11 +109,10 @@ export default function OrdersPage() {
               <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                 Detail <ChevronRight className="w-3.5 h-3.5" />
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       )}
     </div>
   );
 }
-

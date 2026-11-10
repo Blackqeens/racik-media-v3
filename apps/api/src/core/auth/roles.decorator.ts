@@ -10,7 +10,7 @@
  *   deleteUser() { ... }
  *
  * Daftar role valid sesuai user-lifecycle.md dan ADR-001 D2:
- *   buyer, seller, vendor, freelancer, moderator, admin, superadmin
+ *   member, seller, distributor, service_provider, moderator, admin, master_admin
  */
 import { SetMetadata } from '@nestjs/common';
 

@@ -3,13 +3,17 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = { title: 'Laporan Keuangan' };
 
 /**
- * Financial report page — escrow & payment audit overview.
- * Ref: audit-strategy.md §financial_audit, permission-matrix.md (ADMIN)
+ * Financial overview for Admin; detailed financial analysis is reserved for Master Admin.
+ * Ref: audit-strategy.md §financial_audit, role-responsibility matrix
  */
 export default function FinancialReportPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Laporan Keuangan</h1>
+      <p className="text-sm text-gray-600">
+        Admin memantau transaksi, escrow, dan catatan keuangan. Analisis dan perhitungan mendalam
+        ditangani Master Admin.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[

@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Info
 } from 'lucide-react';
+import { demoServices } from '@/lib/demo-data';
 
 export interface MilestoneTemplate {
   id: string;
@@ -55,6 +56,7 @@ export interface ServiceDetail {
   };
   milestones?: MilestoneTemplate[];
   createdAt: string;
+  isDemo?: boolean;
 }
 
 export default function ServiceDetailPage() {
@@ -71,16 +73,22 @@ export default function ServiceDetailPage() {
   const { data: service, isLoading, isError, error, refetch } = useQuery<ServiceDetail>({
     queryKey: ['service-detail', serviceId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/services/${serviceId}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      try {
+        const res = await fetch(`${API_BASE_URL}/services/${serviceId}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-      if (!res.ok) {
-        throw new Error('Layanan tidak ditemukan atau belum aktif');
+        if (!res.ok) {
+          throw new Error('Layanan tidak ditemukan atau belum aktif');
+        }
+
+        const json = await res.json();
+        return json.data || json;
+      } catch (error) {
+        const service = demoServices.find((item) => item.id === serviceId);
+        if (process.env.NODE_ENV !== 'development' || !service) throw error;
+        return { ...service, isDemo: true };
       }
-
-      const json = await res.json();
-      return json.data || json;
     },
     enabled: !!serviceId,
     staleTime: 1000 * 60 * 3, // Cache 3 menit
@@ -216,6 +224,12 @@ export default function ServiceDetailPage() {
           </span>
         </nav>
 
+        {service.isDemo && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Jasa pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+          </p>
+        )}
+
         {/* Layout Utama: Kiri (Detail & Milestone), Kanan (Booking Card) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
@@ -226,7 +240,7 @@ export default function ServiceDetailPage() {
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm space-y-4">
               <div className="w-full aspect-[21/9] rounded-2xl overflow-hidden bg-slate-100 relative">
                 <img
-                  src={service.coverImage || '/placeholder-service.png'}
+                  src={service.coverImage || '/placeholder-service.svg'}
                   alt={service.title}
                   className="w-full h-full object-cover"
                 />

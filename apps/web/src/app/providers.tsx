@@ -76,6 +76,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const authDisabledForDevelopment =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
   const syncSession = useCallback((s: Session | null) => {
     setSession(s);
@@ -99,6 +102,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
+    if (authDisabledForDevelopment) {
+      setUser({
+        id: 'local-development-user',
+        email: 'local@racik.dev',
+      });
+      setLoading(false);
+      return () => undefined;
+    }
+
     import('@/lib/supabase').then(({ supabase }) => {
       // Ambil session awal
       supabase.auth.getSession().then(({ data }) => {
@@ -115,7 +127,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe?.();
-  }, [syncSession]);
+  }, [authDisabledForDevelopment, syncSession]);
 
   return (
     <AuthContext.Provider
@@ -123,7 +135,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         loading,
-        isAuthenticated: !!session,
+        isAuthenticated: authDisabledForDevelopment || !!session,
         refresh,
       }}
     >

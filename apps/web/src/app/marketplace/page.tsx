@@ -13,6 +13,7 @@ import {
   RotateCw,
   PackageX
 } from 'lucide-react';
+import { demoProducts } from '@/lib/demo-data';
 
 // Type definition sesuai data model Catalog / Marketplace
 export interface ProductItem {
@@ -35,6 +36,7 @@ export interface ProductItem {
 
 interface CatalogResponse {
   data: ProductItem[];
+  isDemo?: boolean;
   meta?: {
     total: number;
     page: number;
@@ -77,17 +79,40 @@ export default function MarketplacePage() {
       params.append('page', page.toString());
       params.append('limit', '12');
 
-      const response = await fetch(`${API_BASE_URL}/marketplace/catalog?${params.toString()}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      try {
+        const response = await fetch(`${API_BASE_URL}/marketplace/catalog?${params.toString()}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!response.ok) {
-        throw new Error('Gagal memuat katalog produk marketplace');
+        if (!response.ok) {
+          throw new Error('Gagal memuat katalog produk marketplace');
+        }
+
+        return response.json();
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'development') throw error;
+
+        const filtered = demoProducts.filter((product) => {
+          const matchesCategory =
+            selectedCategory === 'all' || product.category === selectedCategory;
+          const matchesSearch =
+            !searchTerm ||
+            `${product.title} ${product.description}`.toLowerCase().includes(searchTerm.toLowerCase());
+          return matchesCategory && matchesSearch;
+        });
+        if (sortBy === 'price_asc') filtered.sort((a, b) => a.price - b.price);
+        if (sortBy === 'price_desc') filtered.sort((a, b) => b.price - a.price);
+        if (sortBy === 'popular') filtered.sort((a, b) => (b.soldCount ?? 0) - (a.soldCount ?? 0));
+
+        const start = (page - 1) * 12;
+        return {
+          data: filtered.slice(start, start + 12),
+          isDemo: true,
+          meta: { total: filtered.length, page, lastPage: Math.max(1, Math.ceil(filtered.length / 12)) },
+        };
       }
-
-      return response.json();
     },
     staleTime: 1000 * 60 * 2, // Cache 2 menit
   });
@@ -183,6 +208,12 @@ export default function MarketplacePage() {
             ))}
           </div>
         </div>
+
+        {data?.isDemo && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Produk pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+          </p>
+        )}
 
         {/* Konten Utama (Grid Produk / Skeletons / State) */}
         {isLoading ? (

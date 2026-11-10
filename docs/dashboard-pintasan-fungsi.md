@@ -495,14 +495,15 @@ User membeli produk
   -> user melihat status pesanan terbaru
 ```
 
-### Admin memoderasi konten seller atau member
+### Moderator memoderasi konten dari semua role
 
 ```text
 Konten dibuat
-  -> status awal pending review
-  -> admin membuka /admin/moderation
-  -> admin menyetujui atau menolak
-  -> status konten berubah
+  -> status awal draft
+  -> pemilik mengajukan untuk review
+  -> moderator membuka /admin/moderation
+  -> moderator menerbitkan, meminta revisi, atau menolak
+  -> konten berstatus published baru tampil ke publik
   -> pemilik konten melihat hasil melalui dashboard
 ```
 
@@ -708,6 +709,7 @@ member-uat@racikmedia.test
 seller-uat@racikmedia.test
 moderator-uat@racikmedia.test
 admin-uat@racikmedia.test
+master-admin-uat@racikmedia.test
 ```
 
 `.test` bukan domain publik, tetapi Supabase lokal atau provider email test tetap perlu dikonfigurasi agar verifikasi email dapat menerima atau melewati proses dengan benar.
@@ -720,10 +722,11 @@ Minimal siapkan 4 akun:
 
 | Akun | Role Database | Tujuan Pengujian |
 |---|---|---|
-| Member | `member` | Dashboard user, pesanan, bookmark, artikel user |
-| Seller | `member` + `seller` | Dashboard seller, tambah produk, pesanan masuk |
+| Member | `member` | Dashboard user, pesanan, bookmark, ajukan artikel |
+| Seller | `member` + `seller` | Dashboard seller, tambah produk, pesanan masuk, ajukan artikel |
 | Moderator | `member` + `moderator` | Moderasi konten dan produk |
-| Admin | `member` + `admin` | Verifikasi seller, laporan, dashboard admin |
+| Admin | `member` + `admin` | Administrasi, verifikasi seller, pemantauan keuangan |
+| Master Admin | `member` + `master_admin` | Seluruh akses dan override role dengan audit |
 
 Tambahan akun untuk edge case:
 
@@ -733,18 +736,18 @@ Tambahan akun untuk edge case:
 | Seller Pending | Role seller dengan status `under_review` | Tidak boleh mengakses fitur aktif |
 | User Tanpa Role Seller | Hanya `member` | Mencegah masuk route seller |
 | Akun Belum Login | Tidak ada session | Redirect ke login |
-| Multi-role | `member` + `seller` + `author` | Menguji role switcher dan permission gabungan |
+| Multi-role | `member` + `seller` + `moderator` | Menguji role switcher dan permission gabungan |
 
 Database saat ini menerima role:
 
 ```text
 member
-author
 seller
 distributor
 service_provider
 moderator
 admin
+master_admin
 ```
 
 Karena `user_roles.role_type` bersifat additive, satu akun dapat mempunyai beberapa baris role. Namun middleware saat ini menggunakan nama route dan daftar role tertentu. Role switcher hanya boleh ditambahkan bila frontend dan backend sudah membaca daftar role secara konsisten.
@@ -836,9 +839,25 @@ ON CONFLICT (user_id, role_type) DO UPDATE SET
   status = EXCLUDED.status;
 ```
 
+Contoh untuk Master Admin (jalankan secara manual hanya untuk akun tepercaya):
+
+```sql
+INSERT INTO public.user_roles (tenant_id, user_id, role_type, status)
+SELECT
+  '00000000-0000-0000-0000-000000000001',
+  u.id,
+  'master_admin',
+  'active'
+FROM auth.users u
+WHERE u.email = 'master-admin-uat@example.com'
+ON CONFLICT (user_id, role_type) DO UPDATE SET
+  status = EXCLUDED.status;
+```
+
 Catatan:
 
 - Jangan memberi role admin atau moderator melalui query yang dapat dijalankan pengguna biasa.
+- Berikan `master_admin` hanya kepada akun tepercaya melalui proses manual yang diaudit.
 - Jangan hard-code email admin sebagai satu-satunya proteksi.
 - Gunakan SQL manual, migration, atau admin workflow dengan audit log yang terbatas pada admin berwenang.
 - Setelah memberi role, logout dan login kembali agar seluruh session dibangun ulang.
@@ -892,6 +911,10 @@ Member -> /admin/dashboard ditolak atau dialihkan
 Seller -> /seller/dashboard berhasil
 Seller -> /admin/dashboard  ditolak
 Admin  -> /admin/dashboard  berhasil
+Admin  -> /admin/moderation ditolak
+Moderator -> /admin/moderation berhasil
+Moderator -> /admin/financial-report ditolak
+Master Admin -> route role lain berhasil, dengan override tercatat
 Admin  -> /seller/dashboard hanya bila role seller juga aktif
 ```
 
@@ -901,24 +924,13 @@ Dashboard tidak boleh menentukan izin sendiri. Middleware dan API tetap menjadi 
 
 ## 6. Temuan yang Perlu Diperiksa Saat Ini
 
-Ada perbedaan nama role yang perlu diselaraskan sebelum testing:
+Model role yang digunakan:
 
-- Schema database menerima `seller`, bukan `vendor`.
-- Schema database menerima `admin` dan `moderator`.
-- Middleware saat ini memeriksa `seller` atau `vendor` untuk route seller, serta `admin`, `master_admin`, atau `moderator` untuk route admin.
-- Middleware tidak memeriksa nilai `author` meskipun role tersebut ada pada database.
-- Sidebar menggunakan role string sederhana `user`, `seller`, dan `admin`.
-
-Sebelum diuji lintas-role:
-
-1. Tetapkan apakah role member akan selalu menggunakan nama `member`.
-2. Jangan gunakan `user`, `vendor`, atau `master_admin` tanpa menambahkan value tersebut pada schema dan API secara konsisten.
-3. Untuk akun seller gunakan `member` + `seller`.
-4. Untuk akun moderator gunakan `member` + `moderator`.
-5. Untuk akun admin gunakan `member` + `admin`.
-6. Tambahkan role switcher hanya setelah source daftar role dari API benar-benar tersedia.
-
-Tanpa penyelarasan ini, akun dapat terlihat berhasil login tetapi diarahkan ke dashboard yang salah atau ditolak karena middleware mencari role yang tidak ada pada database.
+- `member`, `seller`, `distributor`, `service_provider`, `moderator`, `admin`, dan `master_admin`.
+- “Agen” adalah sebutan umum; role database tetap `distributor`.
+- Author bukan role. Semua pengguna terautentikasi boleh menulis dan mengajukan konten.
+- Admin mengelola administrasi dan pemantauan keuangan, bukan moderasi atau analisis keuangan mendalam.
+- Master Admin dapat mengambil alih akses role lain; setiap override harus tercatat di audit log.
 
 ---
 
@@ -933,7 +945,8 @@ Tanpa penyelarasan ini, akun dapat terlihat berhasil login tetapi diarahkan ke d
 - [ ] Link artikel menuju halaman artikel yang tersedia.
 - [ ] Member tidak dapat membuka `/seller/dashboard`.
 - [ ] Member tidak dapat membuka `/admin/dashboard`.
-- [ ] Membuat artikel hanya tersedia jika fitur dan permission sudah disetujui.
+- [ ] Member dapat membuat draf dan mengajukan tulisan kepada Moderator.
+- [ ] Tulisan yang belum disetujui tidak dapat dibaca melalui endpoint publik.
 
 ### Uji Seller
 
@@ -949,19 +962,26 @@ Tanpa penyelarasan ini, akun dapat terlihat berhasil login tetapi diarahkan ke d
 ### Uji Admin
 
 - [ ] Admin dapat membuka `/admin/dashboard`.
-- [ ] Admin dapat membuka `/admin/moderation`.
+- [ ] Admin tidak dapat membuka `/admin/moderation`.
 - [ ] Admin dapat membuka `/admin/seller-verification`.
 - [ ] Admin dapat membuka `/admin/financial-report`.
-- [ ] Admin dapat menyetujui atau menolak dengan status yang tepat.
+- [ ] Admin tidak melakukan analisis atau perhitungan keuangan mendalam.
 - [ ] Semua action admin tercatat atau dapat diaudit.
 - [ ] Admin tidak boleh mengambil hak seller tanpa role seller.
 
 ### Uji Moderator
 
 - [ ] Moderator dapat membuka route moderasi.
-- [ ] Moderator tidak dapat membuka route dashboard keuangan admin bila tidak mempunyai admin.
+- [ ] Moderator dapat menerbitkan konten setelah menyetujui.
+- [ ] Moderator tidak dapat membuka dashboard administrasi, verifikasi seller, atau laporan keuangan.
 - [ ] Moderator tidak dapat mengubah role user.
 - [ ] Moderator dapat menyelesaikan tindakan moderasi yang sesuai haknya.
+
+### Uji Master Admin
+
+- [ ] Master Admin dapat membuka fungsi administrasi, moderasi, dan keuangan.
+- [ ] Override route yang tidak dimiliki role lain menghasilkan catatan audit.
+- [ ] Master Admin tidak dapat diberikan melalui registrasi publik.
 
 ### Uji Multi-role
 

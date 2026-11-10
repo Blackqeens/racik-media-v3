@@ -6,7 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 flex gap-3">
+    <div className="mx-auto flex w-full gap-3">
       <Sidebar role="admin" />
       <div className="flex-1 min-w-0">{children}</div>
     </div>

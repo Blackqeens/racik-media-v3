@@ -7,12 +7,12 @@ export type UserStatus = 'active' | 'suspended' | 'restricted' | 'deleted';
 export type KycTier = 0 | 1 | 2 | 3;
 export type RoleType =
   | 'member'
-  | 'author'
   | 'seller'
   | 'distributor'
   | 'service_provider'
   | 'moderator'
-  | 'admin';
+  | 'admin'
+  | 'master_admin';
 export type RoleStatus = 'active' | 'suspended' | 'pending';
 
 export interface User {

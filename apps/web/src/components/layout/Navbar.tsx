@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
@@ -21,29 +21,6 @@ import { useCartStore, selectCartCount } from '@/stores/cart.store';
 type DropdownName = 'article' | 'theme' | 'user' | null;
 type ThemeName = 'light' | 'dark' | 'ocean' | 'sunset' | 'lavender';
 
-/*
- * EDIT MANUAL - DAFTAR TEMA
- * Setiap item menentukan satu pilihan warna pada menu Tema:
- *
- * id:
- *   Nama teknis tema. Nilai ini disimpan ke localStorage dan dipakai sebagai
- *   data-theme pada HTML. Contoh tema baru: 'forest' atau 'rose'.
- *
- * label:
- *   Nama tema yang terlihat oleh pengguna pada dropdown.
- *
- * swatch:
- *   Warna kotak preview pada menu. Gunakan class Tailwind, seperti:
- *   bg-white, bg-slate-800, bg-sky-500, bg-emerald-600, atau bg-[#HEXCOLOR].
- *
- * Untuk menambah tema:
- * 1. Tambahkan nama baru pada ThemeName, misalnya 'forest'.
- * 2. Tambahkan objek tema pada array themes di bawah.
- * 3. Tambahkan CSS html[data-theme="forest"] pada globals.css.
- *
- * Contoh:
- * { id: 'forest', label: 'Hutan', swatch: 'bg-emerald-700' }
- */
 const themes: { id: ThemeName; label: string; swatch: string }[] = [
   { id: 'light', label: 'Terang', swatch: 'bg-white border border-gray-300' },
   { id: 'dark', label: 'Gelap', swatch: 'bg-slate-800' },
@@ -58,20 +35,53 @@ const roleLabels: Record<string, string> = {
   seller: 'Seller',
   distributor: 'Distributor',
   service_provider: 'Penyedia Jasa',
+  'service-provider': 'Penyedia Jasa',
+  expert: 'Penyedia Jasa',
   moderator: 'Moderator',
   admin: 'Admin',
+  master_admin: 'Master Admin',
+  super_admin: 'Master Admin',
 };
+
+const devRoleNames: Record<string, string> = {
+  member: 'Member Racik',
+  author: 'Penulis Racik',
+  seller: 'Mitra Seller',
+  distributor: 'Mitra Distributor',
+  service_provider: 'Mitra Penyedia Jasa',
+  moderator: 'Moderator Kurasi',
+  admin: 'Admin Operasional',
+  master_admin: 'Master Admin',
+};
+
+function inferRoleFromPathname(pathname: string): string | null {
+  if (pathname.startsWith('/admin/moderation')) return 'moderator';
+  if (pathname.startsWith('/admin')) return 'master_admin';
+  if (pathname.startsWith('/seller')) return 'seller';
+  if (pathname.startsWith('/distributor')) return 'distributor';
+  if (pathname.startsWith('/service-provider')) return 'service_provider';
+  if (pathname.startsWith('/author')) return 'author';
+  return null;
+}
 
 export function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, session, loading } = useAuth();
   const cartItems = useCartStore((s) => s.items);
   const cartCount = selectCartCount(cartItems);
   const [openDropdown, setOpenDropdown] = useState<DropdownName>(null);
   const [theme, setTheme] = useState<ThemeName>('light');
   const [roles, setRoles] = useState<string[]>([]);
+  const [profileName, setProfileName] = useState<string>('');
+  const [devRole, setDevRole] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
+
+  const isDevBypass =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true' &&
+    !session?.user?.id;
 
   useEffect(() => {
     const saved = window.localStorage.getItem('racik-theme') as ThemeName | null;
@@ -89,110 +99,215 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  // Sinkronisasi role dari localStorage (Dev Mode) + Pathname
+  useEffect(() => {
+    function syncDevRole() {
+      const saved = window.localStorage.getItem('racik-dev-role');
+      const normalized = saved === 'service-provider' || saved === 'expert' ? 'service_provider' : saved;
+      const fromPath = inferRoleFromPathname(pathname);
+      setDevRole(fromPath || normalized || 'member');
+    }
+    syncDevRole();
+    window.addEventListener('racik-dev-role-change', syncDevRole);
+    return () => window.removeEventListener('racik-dev-role-change', syncDevRole);
+  }, [pathname]);
+
+  // Sinkronisasi role & nama profil dari Supabase jika login asli
   useEffect(() => {
     if (!session?.user.id) {
       setRoles([]);
+      setProfileName('');
       return;
     }
 
-    supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .eq('status', 'active')
-      .then(({ data }) => {
-        setRoles((data ?? []).map((item) => item.role_type).filter(Boolean));
-      });
+    const userId = session.user.id;
+
+    Promise.all([
+      supabase
+        .from('user_roles')
+        .select('role_type, status')
+        .eq('user_id', userId)
+        .eq('status', 'active'),
+      supabase
+        .from('individual_profiles')
+        .select('full_name, display_name, user_role, is_admin')
+        .eq('user_id', userId)
+        .maybeSingle(),
+    ]).then(([rolesRes, profileRes]) => {
+      const collected = new Set<string>();
+      for (const item of rolesRes.data ?? []) {
+        if (item.role_type) {
+          collected.add(item.role_type === 'expert' ? 'service_provider' : item.role_type);
+        }
+      }
+      const prof = profileRes.data as {
+        full_name?: string;
+        display_name?: string;
+        user_role?: string;
+        is_admin?: boolean;
+      } | null;
+
+      if (prof?.is_admin) collected.add('master_admin');
+      if (prof?.user_role) {
+        const mapped =
+          prof.user_role === 'expert'
+            ? 'service_provider'
+            : prof.user_role === 'buyer'
+              ? 'member'
+              : prof.user_role;
+        collected.add(mapped);
+      }
+      if (collected.size === 0) collected.add('member');
+
+      setRoles(Array.from(collected));
+      setProfileName(prof?.display_name || prof?.full_name || '');
+    });
   }, [session?.user.id]);
 
-  const fullName =
-    (session?.user?.user_metadata?.full_name as string) ||
-    session?.user?.email?.split('@')[0] ||
-    'Pengguna';
-  const displayName = fullName.split(' ')[0];
-  const initial = (fullName[0] || 'U').toUpperCase();
-  const activeRole = roles.includes('admin')
-    ? 'admin'
-    : roles.includes('moderator')
-      ? 'moderator'
-      : roles.includes('seller')
-        ? 'seller'
-        : roles.includes('author')
-          ? 'author'
-          : roles.includes('distributor')
+  const effectiveRoles = isDevBypass
+    ? [inferRoleFromPathname(pathname) || devRole || 'member']
+    : roles.length
+      ? roles
+      : ['member'];
+
+  const activeRole = effectiveRoles.includes('master_admin') || effectiveRoles.includes('super_admin')
+    ? 'master_admin'
+    : effectiveRoles.includes('admin')
+      ? 'admin'
+      : effectiveRoles.includes('moderator')
+        ? 'moderator'
+        : effectiveRoles.includes('seller')
+          ? 'seller'
+          : effectiveRoles.includes('distributor')
             ? 'distributor'
-            : roles.includes('service_provider')
+            : effectiveRoles.includes('service_provider')
               ? 'service_provider'
-              : 'member';
+              : effectiveRoles.includes('author')
+                ? 'author'
+                : 'member';
+
+  const fullName = isDevBypass
+    ? devRoleNames[activeRole] ?? 'Member Racik'
+    : profileName ||
+      (session?.user?.user_metadata?.full_name as string) ||
+      session?.user?.email?.split('@')[0] ||
+      roleLabels[activeRole] ||
+      'Member';
+
+  const displayName = fullName;
+  const initial = (fullName[0] || 'U').toUpperCase();
+
+  const dashboardHomeHref: Record<string, string> = {
+    member: '/dashboard',
+    author: '/author/dashboard',
+    seller: '/seller/dashboard',
+    distributor: '/distributor/dashboard',
+    service_provider: '/service-provider/dashboard',
+    moderator: '/admin/moderation',
+    admin: '/admin/dashboard',
+    master_admin: '/admin/dashboard',
+  };
+  const dashboardHome = dashboardHomeHref[activeRole] ?? '/dashboard';
 
   function toggleDropdown(name: Exclude<DropdownName, null>) {
     setOpenDropdown((current) => (current === name ? null : name));
   }
 
   function changeTheme(nextTheme: ThemeName) {
-    // EDIT MANUAL - AKSI SAAT TEMA DIPILIH:
-    // nextTheme dipakai untuk menyimpan tema terakhir dan memberi atribut
-    // data-theme pada tag <html>. Tema 'light' mengosongkan atribut agar CSS
-    // kembali memakai warna default. Untuk custom tema lain, CSS harus ada di
-    // html[data-theme="nama-tema"] pada globals.css.
     setTheme(nextTheme);
     window.localStorage.setItem('racik-theme', nextTheme);
     document.documentElement.dataset.theme = nextTheme === 'light' ? '' : nextTheme;
     setOpenDropdown(null);
   }
 
+  function handleSwitchRole(targetRole: string, href: string) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('racik-dev-role', targetRole);
+      if (targetRole === 'master_admin') {
+        window.localStorage.setItem('racik-dev-master', 'true');
+      }
+      window.dispatchEvent(new Event('racik-dev-role-change'));
+    }
+    setDevRole(targetRole);
+    setOpenDropdown(null);
+    router.push(href);
+  }
+
   async function handleLogout() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('racik-dev-role');
+      window.localStorage.removeItem('racik-dev-master');
+    }
     await supabase.auth.signOut();
     setOpenDropdown(null);
     router.push('/login');
     router.refresh();
   }
 
-  const roleMenu = {
+  const roleMenu: Record<string, readonly (readonly [string, string])[]> = {
     member: [
       ['Dashboard Member', '/dashboard'],
       ['Profil Saya', '/profile'],
       ['Pesanan Saya', '/orders'],
       ['Artikel Tersimpan', '/bookmarks'],
     ],
-    seller: [
-      ['Dashboard Seller', '/seller/dashboard'],
-      ['Produk Saya', '/seller/products'],
-      ['Pesanan Masuk', '/seller/orders'],
-      ['Laporan Seller', '/seller/reports'],
-    ],
     author: [
       ['Dashboard Author', '/author/dashboard'],
       ['Tulis Artikel', '/articles/write'],
+      ['Artikel Tersimpan', '/bookmarks'],
+      ['Profil Saya', '/profile'],
+    ],
+    seller: [
+      ['Dashboard Seller', '/seller/dashboard'],
+      ['Produk Saya', '/seller/products'],
+      ['Tambah Produk', '/seller/products/new'],
+      ['Profil Saya', '/profile'],
     ],
     distributor: [
       ['Dashboard Distributor', '/distributor/dashboard'],
+      ['Profil Saya', '/profile'],
     ],
     service_provider: [
       ['Dashboard Penyedia Jasa', '/service-provider/dashboard'],
+      ['Katalog Layanan', '/services'],
+      ['Profil Saya', '/profile'],
     ],
     moderator: [
-      ['Dashboard Moderasi', '/admin/dashboard'],
-      ['Antrean Moderasi', '/admin/moderation'],
+      ['Panel Moderasi', '/admin/moderation'],
+      ['Profil Saya', '/profile'],
     ],
     admin: [
+      ['Dashboard Member', '/dashboard'],
       ['Dashboard Admin', '/admin/dashboard'],
-      ['Moderasi', '/admin/moderation'],
       ['Verifikasi Seller', '/admin/seller-verification'],
       ['Laporan Keuangan', '/admin/financial-report'],
     ],
-  } as const;
+    master_admin: [
+      ['Dashboard Member', '/dashboard'],
+      ['Dashboard Master Admin', '/admin/dashboard'],
+      ['Antrean Moderasi', '/admin/moderation'],
+      ['Verifikasi Seller', '/admin/seller-verification'],
+      ['Laporan Keuangan', '/admin/financial-report'],
+      ['Dashboard Seller', '/seller/dashboard'],
+      ['Dashboard Penyedia Jasa', '/service-provider/dashboard'],
+    ],
+  };
+
+  const currentMenuItems = roleMenu[activeRole] ?? roleMenu.member;
+
+  const allSwitchableRoles: { role: string; label: string; href: string }[] = [
+    { role: 'member', label: 'Member / Buyer', href: '/dashboard' },
+    { role: 'seller', label: 'Seller', href: '/seller/dashboard' },
+    { role: 'service_provider', label: 'Penyedia Jasa', href: '/service-provider/dashboard' },
+    { role: 'author', label: 'Author', href: '/author/dashboard' },
+    { role: 'distributor', label: 'Distributor', href: '/distributor/dashboard' },
+    { role: 'moderator', label: 'Moderator', href: '/admin/moderation' },
+    { role: 'master_admin', label: 'Master Admin', href: '/admin/dashboard' },
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm" data-theme={theme}>
       <nav ref={navRef} className="mx-auto flex h-[64px] max-w-[1440px] items-center gap-2 px-3 sm:px-4">
-        {/* EDIT MANUAL - TOMBOL SIDEBAR:
-            - Ubah h-[40px]/w-[40px] untuk ukuran lingkaran tombol tiga garis.
-            - Ubah Menu h-[20px]/w-[20px] untuk ukuran ikon tiga garis.
-            - Ubah px-3 pada <nav> untuk menggeser semua tombol logo/menu secara horizontal.
-            - Nama posisi: h=tinggi tombol, w=lebar tombol, px=jarak kiri-kanan navbar.
-            - Jangan menambah margin kiri pada tombol agar pusat ikon tetap sejajar dengan rail sidebar 64px.
-        */}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event('racik-sidebar-toggle'))}
@@ -203,18 +318,10 @@ export function Navbar() {
           <Menu className="h-5 w-5" />
         </button>
         <span className="h-6 w-px shrink-0 bg-gray-200" aria-hidden="true" />
-        {/* EDIT MANUAL - LOGO NAVBAR:
-            - Ubah mr/ml pada Link untuk jarak logo dengan tombol menu dan menu Artikel.
-            - Ubah text-lg untuk ukuran tulisan Racik Media.
-            - Sembunyikan bagian "Media" pada mobile lewat kelas hidden sm:inline.
-        */}
-        <Link href="/" className="ml-1 mr-1 shrink-0 text-lg font-bold text-primary-700">
+        <Link href="/" className="ml-1 mr-1 shrink-0 text-lg font-bold text-primary-700" title="Beranda Racik Media">
           Racik<span className="hidden sm:inline"> Media</span>
         </Link>
 
-        {/* EDIT MANUAL - DROPDOWN ARTIKEL:
-            Menu, lebar popup, dan jarak popup dapat diubah pada blok "Artikel" ini.
-        */}
         <div className="relative hidden md:block">
           <button
             type="button"
@@ -247,12 +354,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* EDIT MANUAL - PENCARIAN:
-            - h-10 = tinggi kolom pencarian.
-            - rounded-lg = sudut kolom.
-            - placeholder="..." = teks panduan pencarian.
-            - mx-1 = jarak dari menu Artikel dan area sebelah kanan.
-        */}
         <div className="mx-1 hidden min-w-0 flex-1 md:flex">
           <label className="flex h-10 w-full items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
             <span className="sr-only">Cari</span>
@@ -264,15 +365,6 @@ export function Navbar() {
           </label>
         </div>
 
-        {/* EDIT MANUAL - TEMA:
-            - daftar tema ada pada variabel themes.
-            - warna tema, dropdown, dan teks tema dapat diedit pada blok ini.
-            - w-[330px] mengatur lebar dropdown tema.
-            - grid-cols-5 mengatur jumlah tema dalam satu baris.
-            - h-8/w-8 mengatur ukuran kotak warna preview.
-            - rounded-lg mengatur sudut kotak warna dan tombol tema.
-            - tema aktif memiliki border-primary-500 dan background primary-50.
-        */}
         <div className="relative ml-auto hidden md:block">
           <button
             type="button"
@@ -306,9 +398,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* EDIT MANUAL - IKON KERANJANG DAN NOTIFIKASI:
-            Ubah p-2 untuk area klik, h-5/w-5 untuk ukuran ikon, dan rounded-lg untuk sudut hover.
-        */}
         <Link href="/cart" className="relative hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-primary-700 sm:block" aria-label="Keranjang">
           <ShoppingCart className="h-5 w-5" />
           {cartCount > 0 && (
@@ -321,11 +410,6 @@ export function Navbar() {
           <Bell className="h-5 w-5" />
         </button>
 
-        {/* EDIT MANUAL - PORTAL PENGGUNA:
-            - roleLabels mengatur nama role yang ditampilkan.
-            - roleMenu mengatur menu dropdown tiap role.
-            - ukuran lingkaran avatar/portal dapat diubah pada blok auth di bawah.
-        */}
         {!loading && (
           isAuthenticated ? (
             <div className="relative shrink-0">
@@ -338,60 +422,61 @@ export function Navbar() {
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary-300 to-sky-300 text-xs font-bold text-primary-900">
                   {initial}
                 </span>
-                <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-700 lg:block">{displayName}</span>
+                <span className="hidden max-w-[140px] truncate text-sm font-medium text-gray-700 lg:block">
+                  {displayName}
+                </span>
+                <span className="hidden rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 md:inline-block">
+                  {roleLabels[activeRole] ?? activeRole}
+                </span>
                 <ChevronDown className="hidden h-3.5 w-3.5 text-gray-400 lg:block" />
               </button>
               {openDropdown === 'user' && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-[260px] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
+                <div className="absolute right-0 top-[calc(100%+8px)] w-[270px] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
                   <div className="mb-1 border-b border-gray-100 px-4 pb-3">
                     <p className="truncate text-sm font-semibold text-gray-800">{fullName}</p>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {(roles.length ? roles : ['member']).map((role) => (
+                      {effectiveRoles.map((role) => (
                         <span key={role} className="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700">
                           {roleLabels[role] ?? role}
                         </span>
                       ))}
                     </div>
                   </div>
-                  {roleMenu[activeRole].map(([label, href]) => (
+                  {currentMenuItems.map(([label, href]) => (
                     <Link
-                      key={href}
+                      key={`${label}-${href}`}
                       href={href}
                       onClick={() => setOpenDropdown(null)}
-                      className="flex px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700"
+                      className="flex px-4 py-2 text-xs font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700"
                     >
                       {label}
                     </Link>
                   ))}
-                  {roles.length > 1 && (
+
+                  {(isDevBypass || effectiveRoles.length > 1) && (
                     <div className="mx-4 my-1 border-t border-gray-100 pt-2">
-                      <p className="mb-1 text-[10px] font-bold uppercase text-gray-400">Pindah peran</p>
-                      {roles.map((role) => (
-                        <Link
-                          key={role}
-                          href={
-                            role === 'admin'
-                              ? '/admin/dashboard'
-                              : role === 'moderator'
-                                ? '/admin/dashboard'
-                                : role === 'seller'
-                                  ? '/seller/dashboard'
-                                  : role === 'author'
-                                    ? '/author/dashboard'
-                                    : role === 'distributor'
-                                      ? '/distributor/dashboard'
-                                      : role === 'service_provider'
-                                        ? '/service-provider/dashboard'
-                                        : '/dashboard'
-                          }
-                          onClick={() => setOpenDropdown(null)}
-                          className="block py-1.5 text-xs text-primary-700 hover:underline"
-                        >
-                          Buka dashboard {roleLabels[role] ?? role}
-                        </Link>
-                      ))}
+                      <p className="mb-1.5 text-[10px] font-bold uppercase text-gray-400">
+                        {isDevBypass ? 'Ganti Peran (Dev Mode)' : 'Pindah Peran'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-1">
+                        {allSwitchableRoles.map((item) => (
+                          <button
+                            key={item.role}
+                            type="button"
+                            onClick={() => handleSwitchRole(item.role, item.href)}
+                            className={`rounded-md px-2 py-1.5 text-left text-[11px] font-medium transition ${
+                              activeRole === item.role
+                                ? 'bg-primary-100 font-semibold text-primary-800'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-primary-700'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
+
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -429,7 +514,7 @@ export function Navbar() {
             <Link href="/articles/write" className="rounded-lg px-3 py-2 text-sm hover:bg-gray-50">Menulis artikel</Link>
             <Link href="/cart" className="rounded-lg px-3 py-2 text-sm hover:bg-gray-50">Keranjang ({cartCount})</Link>
             {isAuthenticated && (
-              <Link href="/dashboard" className="rounded-lg px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50">
+              <Link href={dashboardHome} className="rounded-lg px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50">
                 Buka dashboard {roleLabels[activeRole] ?? activeRole}
               </Link>
             )}

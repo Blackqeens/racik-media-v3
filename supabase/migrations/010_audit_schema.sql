@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS security_audit_logs (
                         CHECK (action_type IN (
                             'incident_detected', 'session_invalidated', 'account_locked',
                             'ip_blocked', 'admin_mitigated', 'mfa_breach_attempt',
-                            'sybil_quarantined', 'aml_hold_triggered'
+                            'sybil_quarantined', 'aml_hold_triggered', 'role_override_used'
                         )),
     metadata        JSONB,
     -- Simpan: geo_hash, user_agent_hash, ip_hash. JANGAN: plaintext IP jika sensitif.

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useCart } from '@/hooks/useCart';
+import { demoProducts } from '@/lib/demo-data';
 import {
   ShieldCheck,
   Store,
@@ -39,6 +40,7 @@ interface ProductDetail {
     joinedAt?: string;
   };
   createdAt: string;
+  isDemo?: boolean;
 }
 
 export default function ProductDetailPage() {
@@ -57,17 +59,22 @@ export default function ProductDetailPage() {
   const { data: product, isLoading, isError, error, refetch } = useQuery<ProductDetail>({
     queryKey: ['marketplace-product', productId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/marketplace/catalog/${productId}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      try {
+        const res = await fetch(`${API_BASE_URL}/marketplace/catalog/${productId}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-      if (!res.ok) {
-        throw new Error('Produk tidak ditemukan atau gagal dimuat');
+        if (!res.ok) {
+          throw new Error('Produk tidak ditemukan atau gagal dimuat');
+        }
+
+        const json = await res.json();
+        return json.data || json;
+      } catch (error) {
+        const product = demoProducts.find((item) => item.id === productId);
+        if (process.env.NODE_ENV !== 'development' || !product) throw error;
+        return { ...product, isDemo: true };
       }
-
-      const json = await res.json();
-      // Handle jika response dibungkus data: { ... }
-      return json.data || json;
     },
     enabled: !!productId,
     staleTime: 1000 * 60 * 3, // Cache 3 menit
@@ -179,7 +186,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  const images = product.images && product.images.length > 0 ? product.images : ['/placeholder-product.png'];
+  const images = product.images && product.images.length > 0 ? product.images : ['/placeholder-product.svg'];
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
@@ -197,6 +204,12 @@ export default function ProductDetailPage() {
             {product.title}
           </span>
         </nav>
+
+        {product.isDemo && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Produk pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+          </p>
+        )}
 
         {/* Grid Detail Produk */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm">

@@ -30,12 +30,10 @@ export class ContentController {
   async listPublished(
     @Query() pagination: PaginationDto,
     @Query('q') q?: string,
-    @Query('status') status?: string,
     @Query('content_type') contentType?: string,
   ) {
     const result = await this.contentService.listPublished(pagination, {
       search: q,
-      status: status || 'published',
       contentType,
     });
     return ApiResponse.paginated(result.data, result.total, pagination.page || 1, pagination.limit || 9);
@@ -55,7 +53,6 @@ export class ContentController {
   ) {
     const result = await this.contentService.listPublished(pagination, {
       search: q,
-      status: 'published',
       contentType: 'event',
     });
     return ApiResponse.paginated(result.data, result.total, pagination.page || 1, pagination.limit || 12);
@@ -66,6 +63,14 @@ export class ContentController {
   @HttpCode(HttpStatus.OK)
   async getDetail(@Param('id') id: string) {
     const content = await this.contentService.getById(id);
+    return ApiResponse.ok(content);
+  }
+
+  @Get('mine/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getMyContent(@Param('id') id: string, @Request() req: { user: { id: string } }) {
+    const content = await this.contentService.getOwnedById(id, req.user.id);
     return ApiResponse.ok(content);
   }
 

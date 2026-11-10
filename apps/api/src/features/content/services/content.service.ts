@@ -56,22 +56,19 @@ export class ContentService {
 
   /**
    * 2. listPublished (GET /api/v1/content)
-   * Support filter: search (q), status, content_type
+   * Support filter: search (q), content_type. Only published content is public.
    */
   async listPublished(pagination: PaginationDto, filters?: {
     search?: string;
-    status?: string;
     contentType?: string;
   }) {
     const page = pagination?.page ? Number(pagination.page) : 1;
     const limit = pagination?.limit ? Number(pagination.limit) : 9;
     const offset = (page - 1) * limit;
-    const statusFilter = filters?.status || 'published';
-
     let query = this.supabase
       .from('content_items')
       .select('*', { count: 'exact' })
-      .eq('status', statusFilter)
+      .eq('status', 'published')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -109,6 +106,18 @@ export class ContentService {
    * 3. getById (GET /api/v1/content/:id)
    */
   async getById(id: string) {
+    return this.findContent(id, true);
+  }
+
+  async getOwnedById(id: string, userId: string) {
+    const item = await this.findContent(id, false);
+    if ((item as any).author_id !== userId) {
+      throw new NotFoundException('Konten tidak ditemukan atau bukan milik pengguna ini');
+    }
+    return item;
+  }
+
+  private async findContent(id: string, publishedOnly: boolean) {
     // Cek apakah parameter berupa UUID
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     
@@ -118,6 +127,7 @@ export class ContentService {
     } else {
       query = query.or(`title.ilike.%${id}%,id.eq.${id}`);
     }
+    if (publishedOnly) query = query.eq('status', 'published');
 
     const { data: item, error } = await query.maybeSingle();
 
@@ -142,10 +152,7 @@ export class ContentService {
    * 4. updateContent (PATCH /api/v1/content/:id)
    */
   async updateContent(id: string, userId: string, dto: UpdateContentDto) {
-    const item = await this.getById(id);
-    if ((item as any).author_id !== userId) {
-      throw new NotFoundException('Konten tidak ditemukan atau bukan milik pengguna ini');
-    }
+    const item = await this.getOwnedById(id, userId);
     if (!['draft', 'revision_requested'].includes((item as any).status)) {
       throw new InternalServerErrorException('Konten yang sedang ditinjau tidak dapat diedit');
     }
@@ -173,10 +180,7 @@ export class ContentService {
    * 5. submitForReview (POST /api/v1/content/:id/submit)
    */
   async submitForReview(id: string, userId: string, tenantId: string) {
-    const item = await this.getById(id);
-    if ((item as any).author_id !== userId) {
-      throw new NotFoundException('Konten tidak ditemukan atau bukan milik pengguna ini');
-    }
+    const item = await this.getOwnedById(id, userId);
     if (!['draft', 'revision_requested'].includes((item as any).status)) {
       throw new InternalServerErrorException('Konten hanya dapat diajukan dari status draft atau revisi');
     }
@@ -196,13 +200,17 @@ export class ContentService {
     }
 
     const effectiveTenantId = tenantId || (item as any).tenant_id;
-    const { data: existingTicket } = await this.supabase
+    const { data: existingTicket, error: existingTicketError } = await this.supabase
       .from('moderation_tickets')
       .select('id')
       .eq('entity_type', 'content_item')
       .eq('entity_id', id)
       .in('status', ['pending', 'assigned', 'under_panel_review'])
       .maybeSingle();
+
+    if (existingTicketError) {
+      throw new InternalServerErrorException(`Gagal memeriksa antrean moderasi: ${existingTicketError.message}`);
+    }
 
     if (!existingTicket) {
       const { error: ticketError } = await this.supabase
@@ -222,7 +230,7 @@ export class ContentService {
       }
     }
 
-    await this.supabase.from('content_lifecycle_logs').insert({
+    const { error: lifecycleError } = await this.supabase.from('content_lifecycle_logs').insert({
       tenant_id: effectiveTenantId,
       content_id: id,
       actor_id: userId,
@@ -230,6 +238,9 @@ export class ContentService {
       new_state: 'under_review',
       rationale_notes: 'Artikel diajukan oleh penulis untuk kurasi moderator',
     });
+    if (lifecycleError) {
+      throw new InternalServerErrorException(`Konten diajukan tetapi riwayat status gagal disimpan: ${lifecycleError.message}`);
+    }
 
     return data;
   }

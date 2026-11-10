@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="Ilustrasi layanan pertanian">
+  <rect width="640" height="480" fill="#f0fdf4"/>
+  <circle cx="320" cy="224" r="118" fill="#dcfce7"/>
+  <path d="M235 310h170M260 310V220h120v90" fill="none" stroke="#15803d" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  <path d="M245 220l75-60 75 60M320 244v42" fill="none" stroke="#16a34a" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  <circle cx="320" cy="230" r="8" fill="#f0fdf4"/>
+</svg>

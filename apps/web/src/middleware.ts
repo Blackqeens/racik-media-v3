@@ -4,18 +4,19 @@ import { createServerClient } from '@supabase/ssr';
 import type { SetAllCookies } from '@supabase/ssr';
 
 /**
- * middleware.ts — Route protection via Supabase SSR session.
+ * middleware.ts — Route protection & Anti-Crack Guard via Supabase SSR.
  *
  * Aturan akses (sesuai permission-matrix.md):
  *   /dashboard/*        → wajib login (semua role)
- *   /seller/*           → wajib login + role seller aktif
- *   /admin/*            → wajib login + role admin/moderator aktif
+ *   /author/*           → wajib login + role author / master_admin
+ *   /seller/*           → wajib login + role seller / master_admin (kecuali /seller/register)
+ *   /distributor/*      → wajib login + role distributor / master_admin
+ *   /service-provider/* → wajib login + role service_provider / expert / master_admin
+ *   /admin/moderation/* → wajib login + role moderator / admin / master_admin
+ *   /admin/* lainnya    → wajib login + role admin / master_admin
  *   /login, /register   → redirect ke /dashboard jika sudah login
- *
- * Ref: security-architecture.md, permission-matrix.md, user-lifecycle.md
  */
 
-// Route yang memerlukan autentikasi (paling tidak harus login)
 const AUTH_REQUIRED = [
   '/dashboard',
   '/profile',
@@ -28,34 +29,30 @@ const AUTH_REQUIRED = [
   '/service-provider',
 ];
 
-// Route yang memerlukan role seller
+const AUTHOR_ROUTES = ['/author'];
 const SELLER_ROUTES = ['/seller/dashboard', '/seller/products', '/seller/orders', '/seller/reports'];
-
-// Route yang memerlukan role admin atau moderator
 const ADMIN_ROUTES = [
   '/admin/dashboard',
-  '/admin/moderation',
   '/admin/seller-verification',
   '/admin/financial-report',
 ];
+const MODERATION_ROUTES = ['/admin/moderation'];
+const DISTRIBUTOR_ROUTES = ['/distributor'];
+const SERVICE_PROVIDER_ROUTES = ['/service-provider'];
 
-const AUTHOR_ROUTES = ['/author/dashboard', '/author/articles', '/author/drafts'];
-const DISTRIBUTOR_ROUTES = ['/distributor/dashboard', '/distributor/coverage', '/distributor/orders', '/distributor/reports'];
-const SERVICE_PROVIDER_ROUTES = [
-  '/service-provider/dashboard',
-  '/service-provider/services',
-  '/service-provider/orders',
-  '/service-provider/reports',
-];
-
-// Route yang hanya bisa diakses kalau BELUM login (redirect ke dashboard jika sudah login)
 const GUEST_ONLY = ['/login', '/register', '/forgot-password'];
+
+function normalizeDbRole(role: string | null | undefined): string | null {
+  if (!role) return null;
+  if (role === 'expert' || role === 'service-provider') return 'service_provider';
+  if (role === 'super_admin') return 'master_admin';
+  if (role === 'buyer' || role === 'user') return 'member';
+  return role;
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // DEVELOPMENT ONLY: bypass route auth while working on dashboard UI.
-  // Production (NODE_ENV=production) must always keep the auth guards below.
   const authDisabledForDevelopment =
     process.env.NODE_ENV === 'development' &&
     process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
@@ -66,12 +63,10 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Buat response mutable agar Supabase SSR bisa refresh cookies
   const response = NextResponse.next({
     request: { headers: request.headers },
   });
 
-  // Buat server-side Supabase client (baca session dari cookie)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -91,14 +86,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Ambil session — ini juga auto-refresh token expired
+  // Gunakan getUser() (bukan getSession()) untuk memverifikasi keaslian token JWT ke server Supabase
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const isLoggedIn = !!session;
+  const isLoggedIn = !!user;
 
-  // ── 1. Guest-only pages: redirect ke /dashboard jika sudah login ──────────
+  // 1. Guest-only pages: redirect ke /dashboard jika sudah login
   if (GUEST_ONLY.some((p) => pathname.startsWith(p))) {
     if (isLoggedIn) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
@@ -106,108 +101,92 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // ── 2. Route yang butuh login ─────────────────────────────────────────────
+  // 2. Route yang butuh login
+  const isProtectedSellerRoute =
+    SELLER_ROUTES.some((p) => pathname.startsWith(p)) ||
+    (pathname.startsWith('/seller') && !pathname.startsWith('/seller/register'));
+  const isProtectedAdminRoute =
+    ADMIN_ROUTES.some((p) => pathname.startsWith(p)) ||
+    (pathname.startsWith('/admin') && !MODERATION_ROUTES.some((p) => pathname.startsWith(p)));
+  const isProtectedModerationRoute = MODERATION_ROUTES.some((p) => pathname.startsWith(p));
+  const isProtectedDistributorRoute = DISTRIBUTOR_ROUTES.some((p) => pathname.startsWith(p));
+  const isProtectedServiceProviderRoute = SERVICE_PROVIDER_ROUTES.some((p) =>
+    pathname.startsWith(p),
+  );
+  const isProtectedAuthorRoute = AUTHOR_ROUTES.some((p) => pathname.startsWith(p));
+
   const needsAuth =
     AUTH_REQUIRED.some((p) => pathname.startsWith(p)) ||
-    SELLER_ROUTES.some((p) => pathname.startsWith(p)) ||
-    ADMIN_ROUTES.some((p) => pathname.startsWith(p)) ||
-    AUTHOR_ROUTES.some((p) => pathname.startsWith(p)) ||
-    DISTRIBUTOR_ROUTES.some((p) => pathname.startsWith(p)) ||
-    SERVICE_PROVIDER_ROUTES.some((p) => pathname.startsWith(p));
+    isProtectedSellerRoute ||
+    isProtectedAdminRoute ||
+    isProtectedModerationRoute ||
+    isProtectedDistributorRoute ||
+    isProtectedServiceProviderRoute ||
+    isProtectedAuthorRoute;
 
   if (needsAuth && !isLoggedIn) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname); // simpan tujuan asal
+    loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── 3. Role check untuk seller routes ────────────────────────────────────
-  if (isLoggedIn && SELLER_ROUTES.some((p) => pathname.startsWith(p))) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .in('role_type', ['seller'])
-      .eq('status', 'active');
+  // Ambil role terverifikasi dari user_roles + individual_profiles jika mengakses rute khusus role
+  const needsRoleVerification =
+    isLoggedIn &&
+    (isProtectedSellerRoute ||
+      isProtectedAdminRoute ||
+      isProtectedModerationRoute ||
+      isProtectedDistributorRoute ||
+      isProtectedServiceProviderRoute ||
+      isProtectedAuthorRoute);
 
-    if (!roles || roles.length === 0) {
-      // Arahkan ke halaman pendaftaran seller jika belum punya role
+  if (needsRoleVerification && user) {
+    const [rolesRes, profileRes] = await Promise.all([
+      supabase
+        .from('user_roles')
+        .select('role_type, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active'),
+      supabase
+        .from('individual_profiles')
+        .select('user_role, is_admin')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ]);
+
+    const verifiedRoles = new Set<string>(['member']);
+    for (const item of rolesRes.data ?? []) {
+      const normalized = normalizeDbRole(item.role_type);
+      if (normalized) verifiedRoles.add(normalized);
+    }
+    const prof = profileRes.data as { user_role?: string; is_admin?: boolean } | null;
+    if (prof?.is_admin) verifiedRoles.add('master_admin');
+    const profRole = normalizeDbRole(prof?.user_role);
+    if (profRole) verifiedRoles.add(profRole);
+
+    const hasAnyRole = (allowed: string[]) => allowed.some((r) => verifiedRoles.has(r));
+
+    if (isProtectedSellerRoute && !hasAnyRole(['seller', 'master_admin'])) {
       return NextResponse.redirect(new URL('/seller/register', request.url));
     }
-  }
 
-  // ── 4. Role check untuk author routes ────────────────────────────────────
-  if (isLoggedIn && AUTHOR_ROUTES.some((p) => pathname.startsWith(p))) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .eq('role_type', 'author')
-      .eq('status', 'active');
-
-    if (!roles || roles.length === 0) {
+    if (isProtectedDistributorRoute && !hasAnyRole(['distributor', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
-  }
 
-  // ── 5. Role check untuk distributor routes ───────────────────────────────
-  if (isLoggedIn && DISTRIBUTOR_ROUTES.some((p) => pathname.startsWith(p))) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .eq('role_type', 'distributor')
-      .eq('status', 'active');
-
-    if (!roles || roles.length === 0) {
+    if (isProtectedServiceProviderRoute && !hasAnyRole(['service_provider', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
-  }
 
-  // ── 6. Role check untuk service-provider routes ──────────────────────────
-  if (isLoggedIn && SERVICE_PROVIDER_ROUTES.some((p) => pathname.startsWith(p))) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .eq('role_type', 'service_provider')
-      .eq('status', 'active');
-
-    if (!roles || roles.length === 0) {
+    if (isProtectedAuthorRoute && !hasAnyRole(['author', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
-  }
 
-  // ── 7. Role check untuk admin/moderator routes ────────────────────────────
-  if (
-    isLoggedIn &&
-    (pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/moderation'))
-  ) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .in('role_type', ['admin', 'moderator'])
-      .eq('status', 'active');
-
-    if (!roles || roles.length === 0) {
+    if (isProtectedAdminRoute && !hasAnyRole(['admin', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
-  }
 
-  // Verifikasi seller dan laporan keuangan hanya untuk admin
-  if (
-    isLoggedIn &&
-    (pathname.startsWith('/admin/seller-verification') || pathname.startsWith('/admin/financial-report'))
-  ) {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role_type, status')
-      .eq('user_id', session.user.id)
-      .eq('role_type', 'admin')
-      .eq('status', 'active');
-
-    if (!roles || roles.length === 0) {
+    if (isProtectedModerationRoute && !hasAnyRole(['moderator', 'admin', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }
@@ -215,10 +194,6 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-/**
- * Matcher — middleware hanya jalan di path ini, bukan di asset/_next/api internal.
- * Pola ini exclude: _next/static, _next/image, favicon.ico, file di public/
- */
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',

@@ -13,7 +13,8 @@ Dokumen ini menjadi acuan untuk menentukan fitur yang boleh dilihat dan dijalank
 7. Admin tidak boleh memperoleh seluruh hak hanya berdasarkan tampilan menu.
 8. Moderator berbeda dari admin dan tidak boleh mengubah verifikasi atau laporan keuangan.
 9. Master admin bersifat khusus dan sebaiknya hanya diberikan kepada akun yang melakukan pengelolaan sistem.
-10. Role `vendor` dan `master_admin` adalah istilah lama/alias yang perlu diselaraskan dengan nama role database sebelum mengandalkan logika aplikasi.
+10. Kontributor adalah kemampuan, bukan role terpisah: semua role pengguna dapat menulis dan mengajukan konten kepada Moderator.
+11. Master Admin dapat mengambil alih akses role lain; setiap penggunaan override wajib tercatat di audit log.
 
 ## 2. Status akses
 
@@ -27,24 +28,18 @@ Dokumen ini menjadi acuan untuk menentukan fitur yang boleh dilihat dan dijalank
 
 ## 3. Matriks halaman umum
 
-| Halaman atau fungsi | Guest | Member | Author | Seller | Distributor | Penyedia Jasa | Moderator | Admin | Master Admin |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Beranda | D | D | D | D | D | D | D | D | D |
-| Marketplace publik | D | D | D | D | D | D | D | D | D |
-| Detail produk publik | D | D | D | D | D | D | D | D | D |
-| Layanan publik | D | D | D | D | D | D | D | D | D |
-| Artikel publik | D | D | D | D | D | D | D | D | D |
-| Event publik | D | D | D | D | D | D | D | D | D |
-| Login dan daftar | D | T | T | T | T | T | T | T | T |
-| Keranjang | T | U | U | U | U | U | U | U | U |
-| Checkout | T | U | U | U | U | U | U | U | U |
-| Profil akun | T | U | U | U | U | U | U | U | U |
-| Dashboard utama | T | U | U | U | U | U | U | U | U |
-| Pesanan yang dibeli | T | U | U | U | U | U | U | U | U |
-| Artikel tersimpan | T | U | U | U | U | U | U | U | U |
-| Tema tampilan | D | U | U | U | U | U | U | U | U |
-| Notifikasi akun | T | U | U | U | U | U | U | U | U |
-| Logout | T | U | U | U | U | U | U | U | U |
+| Halaman atau fungsi | Guest | Member | Seller | Distributor | Penyedia Jasa | Moderator | Admin | Master Admin |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Beranda dan halaman publik | D | D | D | D | D | D | D | D |
+| Artikel yang sudah diterbitkan | D | D | D | D | D | D | D | D |
+| Login dan daftar | D | T | T | T | T | T | T | T |
+| Keranjang dan checkout | T | U | U | U | U | U | U | U |
+| Profil dan dashboard pribadi | T | U | U | U | U | U | U | U |
+| Menulis dan mengajukan konten | T | B | B | B | B | B | B | B |
+| Menyetujui dan menerbitkan konten | T | T | T | T | T | U | T | U |
+| Administrasi dan pemantauan keuangan | T | T | T | T | T | T | U | U |
+| Analisis/perhitungan keuangan mendalam | T | T | T | T | T | T | T | U |
+| Override akses role | T | T | T | T | T | T | T | U* |
 
 ## 4. Matriks dashboard role
 
@@ -78,9 +73,10 @@ Akses utama:
 - marketplace, layanan, artikel, dan event publik
 - tema, keranjang, dan notifikasi miliknya
 
-Akses pengajuan:
+Akses:
 
-- Melamar menjadi author.
+- Menulis ide, cerita, artikel, atau konten lainnya.
+- Mengajukan konten untuk ditinjau Moderator.
 - Mengajukan menjadi seller.
 - Mengajukan menjadi distributor.
 - Mengajukan menjadi penyedia jasa.
@@ -92,26 +88,18 @@ Batasan:
 - Tidak dapat mengakses laporan seller atau laporan keuangan.
 - Tidak dapat melihat atau menjalankan halaman moderasi.
 - Tidak dapat membuka route `/admin/*`.
-- Tidak dapat mempublikasikan artikel melalui jalur resmi jika status author belum disetujui.
 - Tidak dapat mengubah role miliknya sendiri.
 
-### 4.3 Author
+### 4.3 Kontributor konten (semua role)
 
-Akses tambahan selain seluruh hak member:
-
-- Membuat draf artikel atau konten.
-- Mengedit dan menghapus kontennya sendiri.
-- Melihat statistik konten miliknya.
-- Mengirim artikel untuk review.
+Kontributor bukan role tersendiri. Member, seller, distributor, penyedia jasa, moderator, admin, dan Master Admin dapat membuat draf serta mengajukannya untuk moderasi.
 
 Batasan:
 
-- Tidak dapat mempublikasikan langsung jika publikasi membutuhkan moderasi.
-- Tidak dapat mengubah atau menghapus konten milik author lain.
-- Tidak dapat menyetujui konten sendiri.
-- Tidak dapat mengakses moderator atau admin panel.
-- Tidak dapat mengakses data seller, pesanan masuk, atau laporan keuangan.
-- Penghapusan biasanya soft-delete dan harus tercatat.
+- Konten tidak dapat diterbitkan langsung oleh pembuatnya.
+- Hanya Moderator atau Master Admin yang dapat menyetujui dan menerbitkan konten.
+- Pembuat hanya dapat mengubah draf atau konten miliknya yang dikembalikan untuk revisi.
+- Konten yang belum berstatus `published` tidak boleh tampil pada endpoint publik.
 
 ### 4.4 Seller
 
@@ -181,10 +169,9 @@ Catatan: detail role database saat ini perlu konsisten dengan label `service_pro
 
 Akses tambahan:
 
-- `/admin/dashboard` untuk ringkasan moderasi.
 - `/admin/moderation`
 - melihat antrean konten atau laporan yang perlu ditinjau
-- menyetujui atau menolak konten
+- menyetujui, menerbitkan, meminta revisi, atau menolak konten
 - menutup pelanggaran ringan sesuai SOP
 - melihat alasan pelaporan
 
@@ -197,43 +184,35 @@ Batasan:
 - Tidak dapat mengubah konfigurasi platform.
 - Tidak dapat menghapus akun secara permanen.
 - Tidak dapat mengubah data transaksi yang telah final.
-- Tidak boleh menggunakan dashboard admin untuk menjalankan fungsi verifikasi atau keuangan.
-
-Target akhir middleware harus memisahkan halaman moderator dari route admin keuangan dan verifikasi. Saat ini middleware bersama memperbolehkan moderator pada seluruh route `/admin/*`; ini perlu diperketat sebelum UAT.
+- Tidak dapat membuka dashboard administrasi, verifikasi seller, atau laporan keuangan.
 
 ### 4.8 Admin
 
 Akses tambahan:
 
 - `/admin/dashboard`
-- `/admin/moderation`
 - `/admin/seller-verification`
 - `/admin/financial-report`
-- melihat status seluruh penjual dalam lingkup operasional
+- mengelola kebutuhan administrasi platform dan akun
 - memproses verifikasi seller
-- meninjau sengketa
-- melihat laporan keuangan
-- mengelola role non-master sesuai kebijakan
+- memantau transaksi, escrow, dan catatan keuangan
 
 Batasan:
 
-- Tidak dapat mengubah konfigurasi sistem sensitif tanpa master admin.
-- Tidak dapat menghapus master admin.
-- Perubahan role admin, moderator, atau seller harus dicatat audit log.
+- Tidak dapat melakukan moderasi konten.
+- Tidak melakukan analisis atau perhitungan keuangan mendalam; pekerjaan tersebut ditangani Master Admin.
+- Tidak dapat mengambil alih akses role.
+- Perubahan administratif harus dicatat audit log.
 - Tidak dapat memanfaatkan Session Service Role Key atau Secret Key dari browser.
-- Tidak boleh mengubah data transaksi secara sembarangan tanpa jejak audit dan alasan.
-- Role admin baru tidak boleh diberikan dari form publik atau email domain tanpa persetujuan.
 
 ### 4.9 Master Admin
 
 Akses tambahan:
 
-- Seluruh akses admin.
-- Mengelola konfigurasi platform.
-- Memberi dan mencabut role admin.
-- Mengelola role kritis.
-- Mengelola rotasi kunci dan akses sistem sesuai prosedur.
-- Melihat log audit seluruh perubahan hak akses.
+- Seluruh akses Admin dan Moderator.
+- Mengelola arah, konfigurasi, dan tanggung jawab platform.
+- Mengambil alih akses role lain untuk penanganan khusus; setiap override wajib dicatat dan diaudit.
+- Menangani analisis/perhitungan keuangan mendalam atau menugaskannya.
 
 Batasan:
 
@@ -245,25 +224,19 @@ Batasan:
 
 ## 5. Matriks aksi lintas role
 
-| Aksi | Member | Author | Seller | Distributor | Penyedia Jasa | Moderator | Admin | Master Admin |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Membaca artikel | U | U | U | U | U | U | U | U |
-| Membuat draf | Draf | U | U | U | U | U | U | U |
-| Publikasi artikel | T | B/M | B/M | T | T | U* | U* | U |
-| Moderasi artikel | T | T | T | T | T | U | U | U |
-| Membuat produk | T | T | U/M | T | T | T | T | U |
-| Mengubah produk sendiri | T | T | U | T | T | T | T | U |
-| Mengubah produk orang lain | T | T | T | T | T | T | U/M | U |
-| Membuat layanan sendiri | T | T | T | T | U/M | T | T | U |
-| Menangani pesanan pembeli | U | U | U | U | U | T | U/M | U |
-| Memverifikasi seller | T | T | T | T | T | T | U | U |
-| Moderasi laporan | T | T | T | T | T | U | U | U |
-| Melihat laporan keuangan | T | T | T | T | T | T | U/M | U |
-| Memberi role member/seller | T | T | T | T | T | T | U/M | U |
-| Memberi role admin/moderator | T | T | T | T | T | T | T/M | U |
-| Mengubah konfigurasi sistem | T | T | T | T | T | T | T | U |
+| Aksi | Member | Seller | Distributor | Penyedia Jasa | Moderator | Admin | Master Admin |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Membuat dan mengajukan konten | B | B | B | B | B | B | B |
+| Menyetujui dan menerbitkan konten | T | T | T | T | U | T | U |
+| Mengelola produk milik sendiri | T | T | T | T | T | T | U* |
+| Mengelola layanan milik sendiri | T | T | T | T | T | T | U* |
+| Memverifikasi seller | T | T | T | T | T | U | U |
+| Mengelola administrasi platform | T | T | T | T | T | U | U |
+| Memantau keuangan | T | T | T | T | T | U | U |
+| Analisis/perhitungan mendalam | T | T | T | T | T | T | U |
+| Override role | T | T | T | T | T | T | U* |
 
-`U*` berarti moderator dan admin dapat mengelola publikasi hanya sesuai proses moderasi, bukan karena hak bypass otomatis.
+`U*` untuk override wajib menghasilkan catatan audit.
 
 ## 6. Pembatasan route saat ini
 
@@ -274,19 +247,19 @@ Implementasi middleware saat ini melindungi route berikut:
 | `/dashboard/*`, `/profile/*`, `/bookmarks/*`, `/orders/*`, `/checkout/*` | Harus login |
 | `/articles/write/*` | Harus login |
 | `/seller/dashboard/*`, `/seller/products/*`, `/seller/orders/*`, `/seller/reports/*` | Login dan role `seller` atau `vendor` aktif |
-| `/admin/dashboard/*`, `/admin/moderation/*`, `/admin/seller-verification/*`, `/admin/financial-report/*` | Login dan salah satu dari `admin`, `master_admin`, atau `moderator` aktif |
+| `/admin/dashboard/*`, `/admin/seller-verification/*`, `/admin/financial-report/*` | Login dan role `admin` atau `master_admin` aktif |
+| `/admin/moderation/*` | Login dan role `moderator` atau `master_admin` aktif |
 | `/login`, `/register`, `/forgot-password` | Guest; pengguna login dialihkan ke dashboard |
 
 ### Batasan yang perlu diperbaiki
 
-1. Moderator harus dibatasi ke `/admin/dashboard` dan `/admin/moderation`.
-2. `/admin/seller-verification` hanya boleh dibuka admin dan master admin.
-3. `/admin/financial-report` hanya boleh dibuka admin berwenang dan master admin.
-4. Route seller harus memakai `seller` konsisten, bukan hanya alias `vendor`.
-5. Penamaan `master_admin` perlu diputuskan sebagai role tunggal atau alias.
-6. Halaman member, author, distributor, dan service provider perlu route dashboard yang terpisah jika fungsinya berbeda.
-7. Navbar hanya boleh menampilkan menu sesuai role aktif.
-8. Middleware tidak boleh menjadi satu-satunya pengaman karena route dapat dipanggil API langsung.
+1. Moderasi hanya boleh dijalankan Moderator atau Master Admin.
+2. Admin menangani administrasi dan pemantauan keuangan, bukan moderasi atau analisis keuangan mendalam.
+3. Master Admin adalah role terpisah, tidak diberikan melalui registrasi publik, dan override-nya selalu diaudit.
+4. Route seller menggunakan role `seller`; nama “agen” tidak mengubah role database `distributor`.
+5. Semua role terautentikasi dapat mengajukan konten, tetapi hanya konten yang disetujui Moderator yang dapat dipublikasikan.
+6. Navbar hanya menampilkan menu sesuai role aktif.
+7. Middleware tidak boleh menjadi satu-satunya pengaman karena route dapat dipanggil API langsung.
 
 ## 7. Batasan rute server dan data
 
@@ -305,7 +278,7 @@ Contoh pembatasan:
 - Seller dapat mengubah produk hanya jika `product.owner_id = user.id`.
 - Member dapat melihat pesanan hanya jika `order.buyer_id = user.id`.
 - Seller dapat melihat pesanan masuk hanya jika `order.seller_id = user.id`.
-- Author dapat mengubah konten hanya jika `content.author_id = user.id`.
+- Semua kontributor hanya dapat mengubah konten miliknya (`content.author_id = user.id`).
 - Moderator dapat mengubah status konten, tetapi tidak dapat mengubah owner-nya.
 - Admin dapat memverifikasi seller, tetapi perubahan role tetap mempunyai audit log.
 - Financial report harus dibatasi dengan permission khusus, bukan hanya role `admin`.
@@ -315,7 +288,7 @@ Contoh pembatasan:
 Contoh:
 
 - Akun dapat menjadi member dan seller.
-- Akun dapat menjadi member dan author.
+- Akun dapat memiliki role member bersama role operasionalnya; kontributor bukan role terpisah.
 - Akun dapat menjadi member, seller, dan moderator.
 - Akun dapat menjadi admin dan member.
 
@@ -323,7 +296,7 @@ Urutan dashboard yang disarankan:
 
 1. Jika user memilih role aktif, dashboard mengikuti pilihan tersebut.
 2. Jika belum memilih, dashboard menentukan role tertinggi yang aman.
-3. Urutan tampil sementara disarankan: master admin, admin, moderator, seller, author/distributor/service provider, member.
+3. Urutan tampilan role aktif: master admin, admin, moderator, seller, distributor, penyedia jasa, member.
 4. Menu harus mengikuti role aktif, sementara data global tetap memperlihatkan seluruh role milik pengguna.
 5. Setelah role ditambahkan atau dicabut, session dan menu perlu disinkronkan ulang.
 
@@ -345,15 +318,6 @@ Urutan dashboard yang disarankan:
 - Artikel Tersimpan
 - Artikel
 - Tema
-- Logout
-
-### Author
-
-- Dashboard Member atau Author
-- Draf Saya
-- Artikel Saya
-- Buat Artikel
-- Artikel Tersimpan
 - Logout
 
 ### Seller
@@ -392,19 +356,20 @@ Urutan dashboard yang disarankan:
 ### Admin
 
 - Dashboard Admin
-- Moderasi
 - Verifikasi Seller
 - Laporan Keuangan
-- Pengelolaan Role Terbatas
+- Administrasi pengguna
 - Dashboard Member
 - Logout
 
 ### Master Admin
 
 - Semua menu admin
+- Semua menu moderator
 - Konfigurasi Sistem
 - Pengelolaan Master Role
 - Log Audit
+- Override akses (wajib audit)
 - Logout
 
 ## 10. Checklist sebelum UAT role
@@ -412,8 +377,11 @@ Urutan dashboard yang disarankan:
 - Pastikan tiga akun UAT mempunyai role sesuai kebutuhan.
 - Pastikan satu akun member tanpa role tambahan tidak dapat membuka route seller.
 - Pastikan seller dapat membuka dashboard seller, tetapi tidak dapat membuka route admin.
-- Pastikan moderator dapat membuka moderasi, tetapi tidak dapat verifikasi seller atau laporan keuangan.
+- Pastikan moderator dapat meninjau dan menerbitkan konten, tetapi tidak dapat membuka administrasi atau laporan keuangan.
 - Pastikan admin dapat verifikasi seller dan laporan keuangan.
+- Pastikan admin tidak dapat membuka antrean moderasi atau melakukan perhitungan keuangan mendalam.
+- Pastikan Master Admin dapat mengambil alih role dan setiap override tercatat.
+- Pastikan semua role terautentikasi dapat mengajukan tulisan, tetapi tulisan baru menjadi publik setelah disetujui moderator.
 - Pastikan akun multi-role dapat membuka semua dashboard yang memang aktif.
 - Pastikan menu tersembunyi tidak menjadi satu-satunya pengaman.
 - Pastikan API menolak akses tanpa role meski URL diketahui.

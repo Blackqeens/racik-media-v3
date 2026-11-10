@@ -17,6 +17,7 @@ import {
   Truck,
   RotateCw
 } from 'lucide-react';
+import { demoOrders } from '@/lib/demo-data';
 
 interface OrderDetail {
   id: string;
@@ -34,6 +35,7 @@ interface OrderDetail {
     unit_price: number;
     subtotal: number;
   }>;
+  isDemo?: boolean;
 }
 
 export default function OrderDetailPage() {
@@ -52,7 +54,12 @@ export default function OrderDetailPage() {
       }),
   });
 
-  const order = data?.data;
+  const sampleOrder = demoOrders.find((item) => item.id === orderId);
+  const isDemo =
+    process.env.NODE_ENV === 'development' &&
+    (!session || isError) &&
+    !!sampleOrder;
+  const order = data?.data ?? (isDemo ? { ...sampleOrder, isDemo: true } : undefined);
 
   // Mutasi konfirmasi penerimaan pesanan
   const confirmMutation = useMutation({
@@ -101,6 +108,12 @@ export default function OrderDetailPage() {
       >
         <ArrowLeft className="w-4 h-4" /> Kembali ke Riwayat Pesanan
       </Link>
+
+      {isDemo && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Pesanan pratinjau lokal karena API belum tersedia. Tidak ada pembayaran atau perubahan status sungguhan.
+        </p>
+      )}
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -168,7 +181,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Aksi Pembeli */}
-      {order.status === 'escrow_held' && (
+      {order.status === 'escrow_held' && !order.isDemo && (
         <div className="card p-6 bg-slate-50 border-emerald-200 text-center space-y-3">
           <Truck className="w-10 h-10 text-emerald-600 mx-auto" />
           <h3 className="text-sm font-bold text-gray-900">Pesanan Sedang Diproses / Dikirim</h3>
@@ -198,4 +211,3 @@ export default function OrderDetailPage() {
     </div>
   );
 }
-

@@ -26,20 +26,24 @@ interface SellerDashboardData {
 
 export default function SellerDashboardPage() {
   const { session } = useAuth();
+  const isDevBypass =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true' &&
+    !session;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['seller-dashboard'],
     enabled: !!session,
     queryFn: () =>
-      apiClient.get<SellerDashboardData>('/vendors/me/dashboard', {
+      apiClient.get<SellerDashboardData>('/vendors/dashboard', {
         Authorization: `Bearer ${session!.access_token}`,
       }),
   });
 
   const dashboard = data?.data;
 
-  // Jika belum terdaftar sebagai seller
-  if (!isLoading && (isError || !dashboard)) {
+  // Jika login asli tapi belum terdaftar sebagai seller
+  if (!isDevBypass && !isLoading && (isError || (!dashboard && !!session))) {
     return (
       <div className="max-w-3xl mx-auto py-10 space-y-6">
         <div className="card text-center py-16 space-y-4">

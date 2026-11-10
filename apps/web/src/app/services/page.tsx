@@ -16,6 +16,7 @@ import {
   Briefcase,
   Layers
 } from 'lucide-react';
+import { demoServices } from '@/lib/demo-data';
 
 export interface ServiceItem {
   id: string;
@@ -41,6 +42,7 @@ export interface ServiceItem {
 
 interface ServicesResponse {
   data: ServiceItem[];
+  isDemo?: boolean;
   meta?: {
     total: number;
     page: number;
@@ -74,15 +76,34 @@ export default function ServicesPage() {
       params.append('page', page.toString());
       params.append('limit', '12');
 
-      const res = await fetch(`${API_BASE_URL}/services?${params.toString()}`, {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      try {
+        const res = await fetch(`${API_BASE_URL}/services?${params.toString()}`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-      if (!res.ok) {
-        throw new Error('Gagal memuat daftar jasa & layanan pertanian');
+        if (!res.ok) {
+          throw new Error('Gagal memuat daftar jasa & layanan pertanian');
+        }
+
+        return res.json();
+      } catch (error) {
+        if (process.env.NODE_ENV !== 'development') throw error;
+
+        const filtered = demoServices.filter((service) => {
+          const matchesCategory =
+            selectedCategory === 'all' || service.category === selectedCategory;
+          const matchesSearch =
+            !searchTerm ||
+            `${service.title} ${service.description}`.toLowerCase().includes(searchTerm.toLowerCase());
+          return matchesCategory && matchesSearch;
+        });
+        const start = (page - 1) * 12;
+        return {
+          data: filtered.slice(start, start + 12),
+          isDemo: true,
+          meta: { total: filtered.length, page, lastPage: Math.max(1, Math.ceil(filtered.length / 12)) },
+        };
       }
-
-      return res.json();
     },
     staleTime: 1000 * 60 * 3, // Cache 3 menit
   });
@@ -120,6 +141,12 @@ export default function ServicesPage() {
             Tawarkan Jasa Keahlian
           </Link>
         </div>
+
+        {data?.isDemo && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Jasa pratinjau lokal karena API belum tersedia. Data contoh ini tidak tersimpan ke database.
+          </p>
+        )}
 
         {/* Filter & Search Card */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
@@ -213,7 +240,7 @@ export default function ServicesPage() {
                   {/* Thumbnail / Cover */}
                   <div className="w-full aspect-[16/10] bg-slate-100 overflow-hidden relative">
                     <img
-                      src={item.coverImage || '/placeholder-service.png'}
+                      src={item.coverImage || '/placeholder-service.svg'}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

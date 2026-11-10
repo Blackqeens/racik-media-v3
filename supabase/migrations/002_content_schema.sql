@@ -41,7 +41,7 @@ CREATE TRIGGER trg_content_items_updated_at
 
 COMMENT ON TABLE  content_items IS 'Unit pengetahuan platform (Article/Paper/Journal/Event). Wajib kurasi sebelum Published. Owner: Content domain.';
 COMMENT ON COLUMN content_items.geolocation_meta IS 'Wajib untuk type=event. Contoh: ST_MakePoint(106.8456, -6.2088)::POINT';
-COMMENT ON COLUMN content_items.status IS 'draft → under_review → approved → published. Lihat content-lifecycle.md untuk state machine lengkap.';
+COMMENT ON COLUMN content_items.status IS 'draft → under_review → published; Moderator may instead request revision or reject. See content-lifecycle.md for the full state machine.';
 
 
 -- -----------------------------------------------------------------------------

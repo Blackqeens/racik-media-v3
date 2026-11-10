@@ -105,8 +105,8 @@ CREATE TRIGGER trg_users_updated_at
 
 COMMENT ON TABLE  users IS 'Master identity anchor. Single Account Policy enforced via UNIQUE(email). Owner: Identity domain.';
 COMMENT ON COLUMN users.status    IS 'Lifecycle status: active | under_review | restricted | suspended | permanently_revoked';
-COMMENT ON COLUMN users.kyc_tier  IS 'tier_1=member, tier_2=author/seller/provider, tier_3=distributor, tier_4=enterprise';
-COMMENT ON COLUMN users.mfa_enabled IS 'Wajib true untuk role: author, seller, distributor, service_provider, moderator, admin';
+COMMENT ON COLUMN users.kyc_tier  IS 'tier_1=member, tier_2=seller/provider, tier_3=distributor, tier_4=enterprise';
+COMMENT ON COLUMN users.mfa_enabled IS 'Wajib true untuk role: seller, distributor, service_provider, moderator, admin, master_admin';
 
 
 -- -----------------------------------------------------------------------------
@@ -121,8 +121,8 @@ CREATE TABLE IF NOT EXISTS user_roles (
     user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     role_type   VARCHAR(50) NOT NULL
                     CHECK (role_type IN (
-                        'member', 'author', 'seller', 'distributor',
-                        'service_provider', 'moderator', 'admin'
+                        'member', 'seller', 'distributor', 'service_provider',
+                        'moderator', 'admin', 'master_admin'
                     )),
     status      VARCHAR(50) NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active', 'under_review', 'suspended')),
@@ -141,7 +141,7 @@ CREATE TRIGGER trg_user_roles_updated_at
     FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
 COMMENT ON TABLE  user_roles IS 'Additive role expansion per identity. Admin/Moderator dilarang memegang role komersial. Owner: Identity domain.';
-COMMENT ON COLUMN user_roles.role_type IS 'member | author | seller | distributor | service_provider | moderator | admin';
+COMMENT ON COLUMN user_roles.role_type IS 'member | seller | distributor | service_provider | moderator | admin | master_admin';
 
 
 -- -----------------------------------------------------------------------------

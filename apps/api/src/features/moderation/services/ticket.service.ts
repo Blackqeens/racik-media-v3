@@ -7,6 +7,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseClientService } from '../../../core/database/supabase.client';
 import { EventBusService } from '../../../core/events/event-bus.service';
 import { PaginationDto } from '../../../core/shared/dto/pagination.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class TicketService {
@@ -49,23 +50,34 @@ export class TicketService {
         : normalizedDecision === 'revision_requested' || normalizedDecision === 'revision'
           ? 'revision_requested'
           : 'rejected';
-    await this.supabase.admin.from('moderation_tickets').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', ticketId);
+    const now = new Date().toISOString();
+    const { error: ticketError } = await this.supabase.admin
+      .from('moderation_tickets')
+      .update({ status: newStatus, updated_at: now })
+      .eq('id', ticketId);
+    if (ticketError) throw new Error(`Failed to update moderation ticket: ${ticketError.message}`);
+
     if (ticket.entity_type === 'content_item') {
       const contentStatus =
         newStatus === 'approved'
-          ? 'approved'
+          ? 'published'
           : newStatus === 'revision_requested'
             ? 'revision_requested'
             : 'rejected';
-      await this.supabase.admin
+      const { data: publishedContent, error: contentError } = await this.supabase.admin
         .from('content_items')
         .update({
           status: contentStatus,
-          updated_at: new Date().toISOString(),
+          updated_at: now,
         })
-        .eq('id', ticket.entity_id);
+        .eq('id', ticket.entity_id)
+        .select('author_id')
+        .single();
+      if (contentError || !publishedContent) {
+        throw new Error(`Failed to update moderated content: ${contentError?.message ?? 'Content not found'}`);
+      }
 
-      await this.supabase.admin.from('content_lifecycle_logs').insert({
+      const { error: lifecycleError } = await this.supabase.admin.from('content_lifecycle_logs').insert({
         tenant_id: tenantId,
         content_id: ticket.entity_id,
         actor_id: moderatorId,
@@ -73,6 +85,20 @@ export class TicketService {
         new_state: contentStatus,
         rationale_notes: reasonCode,
       });
+      if (lifecycleError) throw new Error(`Failed to log content decision: ${lifecycleError.message}`);
+
+      if (contentStatus === 'published') {
+        await this.eventBus.publish({
+          event_name: 'content.published',
+          tenant_id: tenantId,
+          schema_version: 1,
+          payload: {
+            contentId: ticket.entity_id,
+            authorId: publishedContent.author_id,
+            publishedAt: now,
+          },
+        });
+      }
     }
     await this.eventBus.publish({
       event_name: 'moderation.decision_made', tenant_id: tenantId, schema_version: 1,
