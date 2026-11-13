@@ -9,7 +9,6 @@ import {
   LogOut,
   Menu,
   Palette,
-  PenLine,
   ShoppingCart,
   UserRound,
   X,
@@ -18,15 +17,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useCartStore, selectCartCount } from '@/stores/cart.store';
 
-type DropdownName = 'article' | 'theme' | 'user' | null;
-type ThemeName = 'light' | 'dark' | 'ocean' | 'sunset' | 'lavender';
+type DropdownName = 'theme' | 'user' | null;
+type ThemeName = 'light' | 'forest' | 'ocean' | 'lavender';
 
-const themes: { id: ThemeName; label: string; swatch: string }[] = [
-  { id: 'light', label: 'Terang', swatch: 'bg-white border border-gray-300' },
-  { id: 'dark', label: 'Gelap', swatch: 'bg-slate-800' },
-  { id: 'ocean', label: 'Samudra', swatch: 'bg-sky-500' },
-  { id: 'sunset', label: 'Senja', swatch: 'bg-amber-500' },
-  { id: 'lavender', label: 'Lavender', swatch: 'bg-purple-500' },
+const themes: { id: ThemeName; label: string; bgHex: string; accentHex: string; ringHex: string; desc: string }[] = [
+  { id: 'light', label: 'Bersih', bgHex: '#f8fafc', accentHex: '#64748b', ringHex: '#cbd5e1', desc: 'Putih netral bersih & sederhana' },
+  { id: 'forest', label: 'Sage', bgHex: '#eef5f0', accentHex: '#4d8b6f', ringHex: '#b7d4c3', desc: 'Hijau sage lembut & menenangkan' },
+  { id: 'ocean', label: 'Langit', bgHex: '#eaf2fb', accentHex: '#4f83b8', ringHex: '#bdd2ea', desc: 'Biru langit sejuk & ringan' },
+  { id: 'lavender', label: 'Iris', bgHex: '#f2effb', accentHex: '#8b5cf6', ringHex: '#d8d0f2', desc: 'Lavanda lembut & nyaman' },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -55,12 +53,12 @@ const devRoleNames: Record<string, string> = {
 };
 
 function inferRoleFromPathname(pathname: string): string | null {
-  if (pathname.startsWith('/admin/moderation')) return 'moderator';
+  if (pathname.startsWith('/admin/moderation') || pathname.startsWith('/author')) return 'moderator';
+  if (pathname.startsWith('/admin/administration') || pathname.startsWith('/admin/seller-verification')) return 'admin';
   if (pathname.startsWith('/admin')) return 'master_admin';
   if (pathname.startsWith('/seller')) return 'seller';
   if (pathname.startsWith('/distributor')) return 'distributor';
   if (pathname.startsWith('/service-provider')) return 'service_provider';
-  if (pathname.startsWith('/author')) return 'author';
   return null;
 }
 
@@ -75,6 +73,7 @@ export function Navbar() {
   const [roles, setRoles] = useState<string[]>([]);
   const [profileName, setProfileName] = useState<string>('');
   const [devRole, setDevRole] = useState<string | null>(null);
+  const [hasDevMaster, setHasDevMaster] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
@@ -106,10 +105,15 @@ export function Navbar() {
       const normalized = saved === 'service-provider' || saved === 'expert' ? 'service_provider' : saved;
       const fromPath = inferRoleFromPathname(pathname);
       setDevRole(fromPath || normalized || 'member');
+      setHasDevMaster(window.localStorage.getItem('racik-dev-master') === 'true');
     }
     syncDevRole();
     window.addEventListener('racik-dev-role-change', syncDevRole);
-    return () => window.removeEventListener('racik-dev-role-change', syncDevRole);
+    window.addEventListener('storage', syncDevRole);
+    return () => {
+      window.removeEventListener('racik-dev-role-change', syncDevRole);
+      window.removeEventListener('storage', syncDevRole);
+    };
   }, [pathname]);
 
   // Sinkronisasi role & nama profil dari Supabase jika login asli
@@ -204,10 +208,15 @@ export function Navbar() {
     distributor: '/distributor/dashboard',
     service_provider: '/service-provider/dashboard',
     moderator: '/admin/moderation',
-    admin: '/admin/dashboard',
+    admin: '/admin/administration',
     master_admin: '/admin/dashboard',
   };
   const dashboardHome = dashboardHomeHref[activeRole] ?? '/dashboard';
+  const isUserActive = isAuthenticated || (isDevBypass && !!devRole);
+  const logoHref = isUserActive ? dashboardHome : '/';
+  const logoTitle = isUserActive
+    ? `Kembali ke Dashboard (${roleLabels[activeRole] ?? activeRole})`
+    : 'Beranda Racik Media';
 
   function toggleDropdown(name: Exclude<DropdownName, null>) {
     setOpenDropdown((current) => (current === name ? null : name));
@@ -222,8 +231,40 @@ export function Navbar() {
 
   function handleSwitchRole(targetRole: string, href: string) {
     if (typeof window !== 'undefined') {
+      const normalizedTarget =
+        targetRole === 'service_provider' ? 'service-provider' : targetRole;
+      const normalizedActive =
+        activeRole === 'service_provider' ? 'service-provider' : activeRole;
       window.localStorage.setItem('racik-dev-role', targetRole);
-      if (targetRole === 'master_admin') {
+      if (
+        normalizedTarget === 'seller' ||
+        normalizedTarget === 'distributor' ||
+        normalizedTarget === 'service-provider'
+      ) {
+        window.localStorage.setItem('racik-partner-origin-role', normalizedTarget);
+      } else if (normalizedTarget === 'member') {
+        if (
+          normalizedActive === 'seller' ||
+          normalizedActive === 'distributor' ||
+          normalizedActive === 'service-provider'
+        ) {
+          window.localStorage.setItem('racik-partner-origin-role', normalizedActive);
+        } else if (
+          !href.includes('from=seller') &&
+          !href.includes('from=distributor') &&
+          !href.includes('from=service-provider')
+        ) {
+          window.localStorage.removeItem('racik-partner-origin-role');
+        }
+      } else {
+        window.localStorage.removeItem('racik-partner-origin-role');
+      }
+      if (
+        targetRole === 'master_admin' ||
+        activeRole === 'master_admin' ||
+        effectiveRoles.includes('master_admin') ||
+        window.localStorage.getItem('racik-dev-master') === 'true'
+      ) {
         window.localStorage.setItem('racik-dev-master', 'true');
       }
       window.dispatchEvent(new Event('racik-dev-role-change'));
@@ -237,16 +278,25 @@ export function Navbar() {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('racik-dev-role');
       window.localStorage.removeItem('racik-dev-master');
+      window.localStorage.removeItem('racik-partner-origin-role');
     }
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // abaikan error koneksi saat sign out
+    }
     setOpenDropdown(null);
-    router.push('/login');
-    router.refresh();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    } else {
+      router.push('/');
+    }
   }
 
   const roleMenu: Record<string, readonly (readonly [string, string])[]> = {
     member: [
       ['Dashboard Member', '/dashboard'],
+      ['Riwayat Chat', '/chat'],
       ['Profil Saya', '/profile'],
       ['Pesanan Saya', '/orders'],
       ['Artikel Tersimpan', '/bookmarks'],
@@ -254,40 +304,63 @@ export function Navbar() {
     author: [
       ['Dashboard Author', '/author/dashboard'],
       ['Tulis Artikel', '/articles/write'],
+      ['Riwayat Chat', '/chat'],
       ['Artikel Tersimpan', '/bookmarks'],
       ['Profil Saya', '/profile'],
     ],
     seller: [
       ['Dashboard Seller', '/seller/dashboard'],
+      ['Pesanan Toko', '/seller/orders'],
+      ['Keuangan / Saldo', '/seller/finance'],
+      ['Dashboard Member', '/dashboard?layer=marketplace&from=seller'],
       ['Produk Saya', '/seller/products'],
-      ['Tambah Produk', '/seller/products/new'],
+      ['Riwayat Chat', '/chat'],
       ['Profil Saya', '/profile'],
     ],
     distributor: [
       ['Dashboard Distributor', '/distributor/dashboard'],
+      ['Pesanan Toko', '/distributor/orders'],
+      ['Keuangan / Saldo', '/distributor/finance'],
+      ['Dashboard Member', '/dashboard?layer=marketplace&from=distributor'],
+      ['Riwayat Chat', '/chat'],
       ['Profil Saya', '/profile'],
     ],
     service_provider: [
       ['Dashboard Penyedia Jasa', '/service-provider/dashboard'],
+      ['Pesanan Toko', '/service-provider/orders'],
+      ['Keuangan / Saldo', '/service-provider/finance'],
+      ['Dashboard Member', '/dashboard?layer=marketplace&from=service-provider'],
       ['Katalog Layanan', '/services'],
+      ['Riwayat Chat', '/chat'],
       ['Profil Saya', '/profile'],
     ],
     moderator: [
       ['Panel Moderasi', '/admin/moderation'],
+      ['Live Chat ke Master Admin', '/admin/chat-master?role=moderator'],
+      ['Riwayat Chat', '/chat'],
       ['Profil Saya', '/profile'],
     ],
     admin: [
-      ['Dashboard Member', '/dashboard'],
-      ['Dashboard Admin', '/admin/dashboard'],
-      ['Verifikasi Seller', '/admin/seller-verification'],
-      ['Laporan Keuangan', '/admin/financial-report'],
+      ['Dashboard Admin (Administrasi)', '/admin/administration'],
+      ['Pusat Bantuan & Tiket Member', '/admin/helpdesk'],
+      ['Pengajuan Seller & Distributor', '/admin/seller-verification'],
+      ['Komplain & Penyelesaian Masalah', '/admin/administration?tab=complaints'],
+      ['Dokumen & Legalitas Mitra', '/admin/administration?tab=legality'],
+      ['Live Chat ke Master Admin', '/admin/chat-master'],
+      ['Riwayat Chat', '/chat'],
+      ['Profil Saya', '/profile'],
     ],
     master_admin: [
-      ['Dashboard Member', '/dashboard'],
       ['Dashboard Master Admin', '/admin/dashboard'],
-      ['Antrean Moderasi', '/admin/moderation'],
-      ['Verifikasi Seller', '/admin/seller-verification'],
-      ['Laporan Keuangan', '/admin/financial-report'],
+      ['Pengaturan Algoritma Penjualan (AI)', '/admin/algorithm-settings'],
+      ['Akses Skill AI (Bantuan Admin)', '/admin/ai-skills'],
+      ['Dashboard Admin (Administrasi & Legalitas)', '/admin/administration'],
+      ['Panel Arsip & Moderasi', '/admin/moderation'],
+      ['Live Chat Tim (Admin & Moderator)', '/admin/chat-master'],
+      ['Verifikasi Pengajuan Mitra', '/admin/seller-verification'],
+      ['Laporan Keuangan & Escrow', '/admin/financial-report'],
+      ['Riwayat Chat', '/chat'],
+      ['Profil Saya', '/profile'],
       ['Dashboard Seller', '/seller/dashboard'],
       ['Dashboard Penyedia Jasa', '/service-provider/dashboard'],
     ],
@@ -297,17 +370,18 @@ export function Navbar() {
 
   const allSwitchableRoles: { role: string; label: string; href: string }[] = [
     { role: 'member', label: 'Member / Buyer', href: '/dashboard' },
+    { role: 'author', label: 'Author (Ide & Cerita)', href: '/author/dashboard' },
     { role: 'seller', label: 'Seller', href: '/seller/dashboard' },
     { role: 'service_provider', label: 'Penyedia Jasa', href: '/service-provider/dashboard' },
-    { role: 'author', label: 'Author', href: '/author/dashboard' },
     { role: 'distributor', label: 'Distributor', href: '/distributor/dashboard' },
-    { role: 'moderator', label: 'Moderator', href: '/admin/moderation' },
+    { role: 'moderator', label: 'Moderator (Naungan Penulis)', href: '/admin/moderation' },
+    { role: 'admin', label: 'Admin (Administrasi & Legalitas)', href: '/admin/administration' },
     { role: 'master_admin', label: 'Master Admin', href: '/admin/dashboard' },
   ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm" data-theme={theme}>
-      <nav ref={navRef} className="mx-auto flex h-[64px] max-w-[1440px] items-center gap-2 px-3 sm:px-4">
+      <nav ref={navRef} className="flex h-[64px] w-full items-center gap-2 px-3">
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event('racik-sidebar-toggle'))}
@@ -318,41 +392,20 @@ export function Navbar() {
           <Menu className="h-5 w-5" />
         </button>
         <span className="h-6 w-px shrink-0 bg-gray-200" aria-hidden="true" />
-        <Link href="/" className="ml-1 mr-1 shrink-0 text-lg font-bold text-primary-700" title="Beranda Racik Media">
-          Racik<span className="hidden sm:inline"> Media</span>
+        <Link
+          href={logoHref}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+          className="ml-1 mr-1 flex shrink-0 items-center select-none"
+          title={logoTitle}
+        >
+          <img
+            src="/images/racik-logo.png"
+            alt="Racik Media"
+            draggable={false}
+            className="h-9 w-auto rounded-md bg-white/95 px-1.5 py-0.5 object-contain select-none"
+          />
         </Link>
-
-        <div className="relative hidden md:block">
-          <button
-            type="button"
-            onClick={() => toggleDropdown('article')}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-              openDropdown === 'article'
-                ? 'border-transparent bg-primary-700 text-white shadow-lg'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:text-primary-700'
-            }`}
-          >
-            <PenLine className="h-4 w-4" />
-            Artikel
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
-          {openDropdown === 'article' && (
-            <div className="absolute left-0 top-[calc(100%+8px)] w-[220px] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
-              <Link href="/articles" className="block px-4 py-2.5 text-xs hover:bg-primary-50 hover:text-primary-700">
-                <span className="block font-semibold text-gray-800">Membaca</span>
-                <span className="mt-1 block text-gray-500">Jelajahi artikel dan jurnal lokal</span>
-              </Link>
-              <Link href="/bookmarks" className="block px-4 py-2.5 text-xs hover:bg-primary-50 hover:text-primary-700">
-                <span className="block font-semibold text-gray-800">Artikel tersimpan</span>
-                <span className="mt-1 block text-gray-500">Lanjutkan membaca favorit Anda</span>
-              </Link>
-              <Link href="/articles/write" className="block px-4 py-2.5 text-xs hover:bg-primary-50 hover:text-primary-700">
-                <span className="block font-semibold text-gray-800">Menulis</span>
-                <span className="mt-1 block text-gray-500">Buat dan publikasikan tulisan</span>
-              </Link>
-            </div>
-          )}
-        </div>
 
         <div className="mx-1 hidden min-w-0 flex-1 md:flex">
           <label className="flex h-10 w-full items-center rounded-lg border border-gray-200 bg-gray-50 px-3">
@@ -377,19 +430,27 @@ export function Navbar() {
             <ChevronDown className="h-3 w-3" />
           </button>
           {openDropdown === 'theme' && (
-            <div className="absolute right-0 top-[calc(100%+8px)] w-[330px] rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
-              <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Tema tampilan</p>
-              <div className="grid grid-cols-5 gap-2">
+            <div className="theme-dropdown-panel absolute right-0 top-[calc(100%+8px)] w-[288px] rounded-2xl border border-gray-200/90 bg-white p-3 shadow-xl">
+              <p className="mb-2 px-1 text-[11px] font-semibold tracking-wide text-gray-500">Pilih Tema Tampilan</p>
+              <div className="grid grid-cols-4 gap-2">
                 {themes.map((item) => (
                   <button
                     key={item.id}
                     type="button"
+                    title={item.desc}
                     onClick={() => changeTheme(item.id)}
-                    className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 text-[10px] font-semibold transition ${
-                      theme === item.id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600'
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-[11px] font-medium transition ${
+                      theme === item.id
+                        ? 'border-emerald-500/80 bg-emerald-50/70 text-emerald-800 shadow-sm'
+                        : 'border-gray-200/80 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <span className={`h-8 w-8 rounded-lg ${item.swatch}`} />
+                    <span
+                      className="flex h-8 w-8 items-end justify-end rounded-lg border p-1"
+                      style={{ backgroundColor: item.bgHex, borderColor: item.ringHex }}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.accentHex }} />
+                    </span>
                     {item.label}
                   </button>
                 ))}
@@ -453,7 +514,11 @@ export function Navbar() {
                     </Link>
                   ))}
 
-                  {(isDevBypass || effectiveRoles.length > 1) && (
+                  {(isDevBypass ||
+                    effectiveRoles.length > 1 ||
+                    effectiveRoles.includes('master_admin') ||
+                    activeRole === 'master_admin' ||
+                    hasDevMaster) && (
                     <div className="mx-4 my-1 border-t border-gray-100 pt-2">
                       <p className="mb-1.5 text-[10px] font-bold uppercase text-gray-400">
                         {isDevBypass ? 'Ganti Peran (Dev Mode)' : 'Pindah Peran'}

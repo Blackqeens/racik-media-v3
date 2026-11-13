@@ -14,6 +14,7 @@ import {
   FileQuestion,
   Sparkles,
 } from 'lucide-react';
+import { useEditorialArchive } from '@/lib/editorial-archive';
 
 export interface HomepageArticleItem {
   id: string;
@@ -127,12 +128,32 @@ const TYPE_FILTER = [
  * dengan tampilan visual jurnalisme berkelas dan ramah pembaca.
  */
 export function HomepageArticles() {
+  const { items: archiveItems } = useEditorialArchive();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
 
+  const curatedArticles: HomepageArticleItem[] = useMemo(() => {
+    const fromArchive = archiveItems
+      .filter((i) => i.entityType === 'article' && i.publishedToHomepage)
+      .map((i) => ({
+        id: i.id,
+        slug: i.slug,
+        title: i.title,
+        excerpt: i.excerpt,
+        contentType: i.contentType ?? 'article',
+        category: i.category,
+        authorName: i.submitterName,
+        publishedAt: i.publishedAt,
+        readTimeMinutes: i.readTimeMinutes ?? 5,
+        image: i.image,
+        isFeatured: i.isFeatured,
+      }));
+    return fromArchive.length > 0 ? fromArchive : ARTICLES_DATA;
+  }, [archiveItems]);
+
   const filteredArticles = useMemo(() => {
-    return ARTICLES_DATA.filter((item) => {
+    return curatedArticles.filter((item) => {
       const matchCat = selectedCategory === 'all' || item.category === selectedCategory;
       const matchType = selectedType === 'all' || item.contentType === selectedType;
       const matchSearch =
@@ -142,7 +163,7 @@ export function HomepageArticles() {
           .includes(search.toLowerCase());
       return matchCat && matchType && matchSearch;
     });
-  }, [search, selectedCategory, selectedType]);
+  }, [curatedArticles, search, selectedCategory, selectedType]);
 
   const featuredArticle = filteredArticles.find((a) => a.isFeatured) || filteredArticles[0];
   const listArticles = filteredArticles.filter((a) => a.id !== featuredArticle?.id);
@@ -236,11 +257,10 @@ export function HomepageArticles() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                selectedCategory === cat.id
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
-              }`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${selectedCategory === cat.id
+                ? 'bg-emerald-700 text-white shadow-sm'
+                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
+                }`}
             >
               {cat.label}
             </button>

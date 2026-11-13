@@ -1,13 +1,40 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { HomepageSidebar } from '@/components/layout/HomepageSidebar';
+import {
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Lock,
+  MapPin,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react';
 import { HomepageMarketplace } from '@/components/marketplace/HomepageMarketplace';
 import { HomepageArticles } from '@/components/articles/HomepageArticles';
 import { HomepageServices } from '@/components/services/HomepageServices';
 import { HomepageEvents } from '@/components/events/HomepageEvents';
 import { DevBypassPanel } from '@/components/home/DevBypassPanel';
+import { useEditorialArchive } from '@/lib/editorial-archive';
+import { useManagedServices } from '@/lib/service-provider-store';
+
+interface ReadOnlyDetailItem {
+  kind: 'article' | 'product' | 'service' | 'event';
+  badge: string;
+  title: string;
+  subtitle: string;
+  summary: string;
+  fullDescription: string;
+  image: string;
+  metaPrimary?: string;
+  metaSecondary?: string;
+}
 
 // ─── Hero Carousel ────────────────────────────────────────────────────────────
 
@@ -65,18 +92,21 @@ function HeroCarousel() {
     });
   }, []);
 
-  const goTo = useCallback((index: number) => {
-    const next = ((index % TOTAL) + TOTAL) % TOTAL;
-    setCurrent(next);
-    resetProgress();
-  }, [TOTAL, resetProgress]);
+  const goTo = useCallback(
+    (index: number) => {
+      const next = ((index % TOTAL) + TOTAL) % TOTAL;
+      setCurrent(next);
+      resetProgress();
+    },
+    [TOTAL, resetProgress],
+  );
 
   const startAutoPlay = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     resetProgress();
     timerRef.current = setInterval(() => {
       setIsPaused((p) => {
-        if (!p) setCurrent((c) => ((c + 1) % TOTAL));
+        if (!p) setCurrent((c) => (c + 1) % TOTAL);
         return p;
       });
     }, DELAY);
@@ -84,7 +114,9 @@ function HeroCarousel() {
 
   useEffect(() => {
     startAutoPlay();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [startAutoPlay]);
 
   return (
@@ -115,7 +147,12 @@ function HeroCarousel() {
             }}
           >
             {/* Background Image */}
-            <Link href={slide.href} className="absolute inset-0 block" aria-label={slide.cta} tabIndex={i === current ? 0 : -1}>
+            <Link
+              href={slide.href}
+              className="absolute inset-0 block"
+              aria-label={slide.cta}
+              tabIndex={i === current ? 0 : -1}
+            >
               <img
                 src={slide.img}
                 alt={slide.alt}
@@ -133,7 +170,8 @@ function HeroCarousel() {
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: 'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.38) 40%, rgba(0,0,0,0.12) 70%, transparent 100%)',
+                background:
+                  'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.38) 40%, rgba(0,0,0,0.12) 70%, transparent 100%)',
               }}
             />
 
@@ -156,14 +194,25 @@ function HeroCarousel() {
                   transition: 'opacity 0.8s ease 0.4s, transform 0.25s ease',
                 }}
               >
-                <span className="inline-block font-sans text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#6ee7b7', letterSpacing: '0.18em' }}>
+                <span
+                  className="inline-block font-sans text-xs font-semibold tracking-widest uppercase mb-3"
+                  style={{ color: '#6ee7b7', letterSpacing: '0.18em' }}
+                >
                   {slide.label}
                 </span>
-                <h2 className="font-serif font-bold leading-tight text-white mb-2.5"
-                  style={{ fontSize: 'clamp(1.9rem, 4vw, 3.2rem)', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+                <h2
+                  className="font-serif font-bold leading-tight text-white mb-2.5"
+                  style={{
+                    fontSize: 'clamp(1.9rem, 4vw, 3.2rem)',
+                    textShadow: '0 2px 12px rgba(0,0,0,0.4)',
+                  }}
+                >
                   {slide.title}
                 </h2>
-                <p className="font-sans font-light leading-relaxed mb-5" style={{ fontSize: 18, color: 'rgba(255,255,255,0.82)' }}>
+                <p
+                  className="font-sans font-light leading-relaxed mb-5"
+                  style={{ fontSize: 18, color: 'rgba(255,255,255,0.82)' }}
+                >
                   {slide.desc}
                 </p>
                 <Link
@@ -180,8 +229,20 @@ function HeroCarousel() {
                   }}
                 >
                   {slide.cta}
-                  <svg xmlns="http://www.w3.org/2000/svg" width={14} height={14} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width={14}
+                    height={14}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M5 12h14M12 5l7 7-7 7"
+                    />
                   </svg>
                 </Link>
               </div>
@@ -192,22 +253,54 @@ function HeroCarousel() {
 
       {/* Prev Arrow */}
       <button
-        onClick={() => { goTo(current - 1); startAutoPlay(); }}
+        onClick={() => {
+          goTo(current - 1);
+          startAutoPlay();
+        }}
         className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full flex items-center justify-center text-white transition-all opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"
-        style={{ border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(6px)' }}
+        style={{
+          border: '1.5px solid rgba(255,255,255,0.3)',
+          background: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(6px)',
+        }}
         aria-label="Slide sebelumnya"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={18}
+          height={18}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
       </button>
 
       {/* Next Arrow */}
       <button
-        onClick={() => { goTo(current + 1); startAutoPlay(); }}
+        onClick={() => {
+          goTo(current + 1);
+          startAutoPlay();
+        }}
         className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full flex items-center justify-center text-white transition-all opacity-0 hover:opacity-100 focus:opacity-100"
-        style={{ border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(6px)' }}
+        style={{
+          border: '1.5px solid rgba(255,255,255,0.3)',
+          background: 'rgba(0,0,0,0.25)',
+          backdropFilter: 'blur(6px)',
+        }}
         aria-label="Slide berikutnya"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={18}
+          height={18}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
       </button>
 
       {/* Dot Indicators */}
@@ -215,7 +308,10 @@ function HeroCarousel() {
         {HERO_SLIDES.map((_, i) => (
           <button
             key={i}
-            onClick={() => { goTo(i); startAutoPlay(); }}
+            onClick={() => {
+              goTo(i);
+              startAutoPlay();
+            }}
             aria-label={`Slide ${i + 1}`}
             className="w-2.5 h-2.5 rounded-full transition-all"
             style={{
@@ -253,13 +349,26 @@ function Divider() {
 
 // ─── Section Header ───────────────────────────────────────────────────────────
 
-function SectionHeader({ label, linkHref, linkText }: { label: string; linkHref?: string; linkText?: string }) {
+function SectionHeader({
+  label,
+  linkHref,
+  linkText,
+}: {
+  label: string;
+  linkHref?: string;
+  linkText?: string;
+}) {
   return (
     <div className="flex items-center gap-3 mb-8">
-      <span className="text-xs font-sans font-semibold tracking-widest uppercase text-gray-500">{label}</span>
+      <span className="text-xs font-sans font-semibold tracking-widest uppercase text-gray-500">
+        {label}
+      </span>
       <span className="flex-1 border-t border-gray-100" />
       {linkHref && linkText && (
-        <Link href={linkHref} className="text-xs font-sans font-medium text-emerald-700 hover:underline tracking-wide">
+        <Link
+          href={linkHref}
+          className="text-xs font-sans font-medium text-emerald-700 hover:underline tracking-wide"
+        >
           {linkText}
         </Link>
       )}
@@ -276,14 +385,25 @@ function MoreStoriesSection() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Featured story */}
         <article className="lg:col-span-2 flex flex-col sm:flex-row gap-6 group">
-          <div className="rounded-md overflow-hidden bg-gray-100 w-full sm:w-56 flex-shrink-0" style={{ aspectRatio: '4/3' }}>
-            <img src="https://images.unsplash.com/photo-1444858291040-58f756a3bdd6?w=700&q=75" alt="Tenun NTT"
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+          <div
+            className="rounded-md overflow-hidden bg-gray-100 w-full sm:w-56 flex-shrink-0"
+            style={{ aspectRatio: '4/3' }}
+          >
+            <img
+              src="https://images.unsplash.com/photo-1444858291040-58f756a3bdd6?w=700&q=75"
+              alt="Tenun NTT"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+            />
           </div>
           <div className="flex flex-col gap-2 justify-center">
-            <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">Budaya</span>
+            <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">
+              Budaya
+            </span>
             <h3 className="font-serif text-xl sm:text-2xl font-semibold leading-snug text-gray-900 group-hover:text-emerald-800 transition-colors">
-              <Link href="/articles">Tenun Ikat NTT: Motif Leluhur yang Kini Dikenakan di Panggung Dunia</Link>
+              <Link href="/articles/tenun-ikat-ntt-motif-leluhur-panggung-dunia">
+                Tenun Ikat NTT: Motif Leluhur yang Kini Dikenakan di Panggung Dunia
+              </Link>
             </h3>
             <p className="font-sans text-sm leading-relaxed text-gray-500 line-clamp-2">
               Desainer muda lokal berkolaborasi dengan penenun lansia di Flores untuk menjaga motif adat tetap hidup dan relevan bagi generasi berikutnya.
@@ -317,10 +437,17 @@ function MoreStoriesSection() {
             <div key={i}>
               <article className="flex gap-4 group">
                 <div className="rounded-md overflow-hidden bg-gray-100 w-24 h-20 flex-shrink-0">
-                  <img src={s.img} alt={s.alt} className="w-full h-full object-cover" loading="lazy" />
+                  <img
+                    src={s.img}
+                    alt={s.alt}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
                 <div className="flex flex-col gap-1 justify-center">
-                  <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">{s.category}</span>
+                  <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">
+                    {s.category}
+                  </span>
                   <h4 className="font-serif text-base font-semibold leading-snug text-gray-900 group-hover:text-emerald-800 transition-colors">
                     <Link href="/articles">{s.title}</Link>
                   </h4>
@@ -354,14 +481,19 @@ function NewsletterSection() {
   return (
     <section className="bg-gray-50 border-t border-b border-gray-100 py-14">
       <div className="max-w-2xl mx-auto px-4 text-center flex flex-col gap-4">
-        <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">Newsletter</span>
+        <span className="text-xs font-sans font-semibold tracking-widest uppercase text-emerald-700">
+          Newsletter
+        </span>
         <h2 className="font-serif text-2xl sm:text-3xl font-bold text-gray-900">
           Cerita terbaik, langsung ke kotak masuk Anda
         </h2>
         <p className="font-sans text-sm text-gray-500 leading-relaxed">
           Bergabunglah dengan ribuan pembaca yang menerima kurasi artikel pilihan dan penawaran produk eksklusif setiap bulan.
         </p>
-        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-3 justify-center mt-2">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col items-center gap-3 justify-center mt-2"
+        >
           <input
             type="email"
             value={email}
@@ -379,7 +511,9 @@ function NewsletterSection() {
               required
               className="mt-0.5 accent-emerald-700"
             />
-            <span>Saya bersedia menerima kurasi artikel dan penawaran produk Racik Media melalui email setiap bulan.</span>
+            <span>
+              Saya bersedia menerima kurasi artikel dan penawaran produk Racik Media melalui email setiap bulan.
+            </span>
           </label>
           <button
             type="submit"
@@ -388,7 +522,9 @@ function NewsletterSection() {
             Langganan Gratis
           </button>
           {status && (
-            <p className="text-sm font-sans text-emerald-700" role="status" aria-live="polite">{status}</p>
+            <p className="text-sm font-sans text-emerald-700" role="status" aria-live="polite">
+              {status}
+            </p>
           )}
         </form>
         <p className="text-xs font-sans text-gray-400">
@@ -401,58 +537,397 @@ function NewsletterSection() {
 
 // ─── HomePageView ─────────────────────────────────────────────────────────────
 
-/**
- * HomePageView — Tampilan utama Beranda Racik Media.
- * Menggabungkan seluruh komponen beranda secara modular dan responsif.
- * Dikelola di file ini sehingga mudah dibedakan dari page.tsx lainnya di editor.
- */
 export function HomePageView() {
+  const router = useRouter();
+  const { items: archiveItems } = useEditorialArchive();
+  useManagedServices();
+  const [isLivePreview, setIsLivePreview] = useState(false);
+  const [returnHref, setReturnHref] = useState('/admin/moderation');
+  const [detailModalItem, setDetailModalItem] = useState<ReadOnlyDetailItem | null>(null);
+  const [previewNotice, setPreviewNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    setIsLivePreview(params.get('mode') === 'live-preview');
+    const from = params.get('from');
+    if (from && from.startsWith('/')) {
+      setReturnHref(from);
+    }
+  }, []);
+
+  const formatRupiah = (val: number) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    }).format(val || 0);
+
+  const previewQuery = `?mode=live-preview&from=${encodeURIComponent(returnHref)}`;
+
+  /**
+   * Pada Mode Live Homepage (Mode Preview):
+   * - Benar-benar menampilkan halaman detail LIVE ukuran penuh (/articles/[slug], /marketplace/[id], /services/[id], atau Full Live Event Detail).
+   * - Akses untuk mengubah, mengedit, atau bertransaksi dibatasi dan diberi keterangan Mode Live Homepage (Mode Preview).
+   */
+  function handlePreviewClickCapture(e: React.MouseEvent<HTMLDivElement>) {
+    if (!isLivePreview) return;
+
+    const target = e.target as HTMLElement;
+
+    // Izinkan interaksi filter/search/tab lokal (input, select, atau tombol filter kategori)
+    if (
+      target.closest('input') ||
+      target.closest('select') ||
+      target.closest('[data-allow-preview-filter="true"]')
+    ) {
+      return;
+    }
+
+    const anchor = target.closest('a');
+    const button = target.closest('button');
+    const cardContainer = target.closest('article, .group');
+
+    // Jika klik link ke artikel, produk, atau jasa → navigasi ke halaman LIVE DETAIL ukuran penuh dengan ?mode=live-preview
+    if (anchor) {
+      e.preventDefault();
+      e.stopPropagation();
+      const href = anchor.getAttribute('href') || '';
+
+      if (href.startsWith('/articles/') && href !== '/articles/write') {
+        router.push(`${href}${previewQuery}`);
+        return;
+      }
+
+      if (href.startsWith('/marketplace/')) {
+        router.push(`${href}${previewQuery}`);
+        return;
+      }
+
+      if (href.startsWith('/services/') && href !== '/services/create') {
+        router.push(`${href}${previewQuery}`);
+        return;
+      }
+
+      // Jika klik link umum di MoreStoriesSection (/articles), arahkan ke artikel terkait jika cocok
+      if (href === '/articles' && cardContainer) {
+        const headingEl = cardContainer.querySelector('h3, h4');
+        const cardTitle = headingEl?.textContent?.trim() || '';
+        const matchedArticle = archiveItems.find(
+          (i) => i.entityType === 'article' && i.title === cardTitle,
+        );
+        if (matchedArticle) {
+          router.push(`/articles/${matchedArticle.slug || matchedArticle.id}${previewQuery}`);
+          return;
+        }
+      }
+
+      // Jika link lain (seperti /articles/write, /seller/register, /marketplace katalog penuh, dll.), blokir akses keluar
+      setPreviewNotice(
+        'Mode Live Homepage (Mode Preview): Akses mengubah atau keluar dari pratinjau dibatasi. Klik pada judul/kartu Artikel, Produk, Jasa, atau Event untuk membuka tampilan Live Detail ukuran penuh.',
+      );
+      setTimeout(() => setPreviewNotice(null), 4000);
+      return;
+    }
+
+    // Jika klik pada kartu Event atau tombol aksi di dalam kartu (misal "+ Keranjang" atau "Daftar Sekarang" pada Event)
+    if (cardContainer) {
+      const headingEl = cardContainer.querySelector('h3, h4');
+      const cardTitle = headingEl?.textContent?.trim() || '';
+      const matchedArchive = archiveItems.find((i) => i.title === cardTitle);
+
+      if (matchedArchive) {
+        // Jika produk marketplace (klik tombol "+ Keranjang"), buka halaman Live Detail Produk ukuran penuh
+        if (matchedArchive.entityType === 'product_description') {
+          e.preventDefault();
+          e.stopPropagation();
+          router.push(`/marketplace/${matchedArchive.id}${previewQuery}`);
+          return;
+        }
+
+        // Jika kartu Event (klik kartu atau tombol "Daftar Sekarang"), buka Tampilan Live Detail Event ukuran penuh
+        if (matchedArchive.entityType === 'event') {
+          e.preventDefault();
+          e.stopPropagation();
+          setDetailModalItem({
+            kind: 'event',
+            badge: matchedArchive.categoryLabel || 'Agenda Event',
+            title: matchedArchive.title,
+            subtitle: matchedArchive.submitterName,
+            summary: matchedArchive.excerpt,
+            fullDescription: matchedArchive.body,
+            image: matchedArchive.image,
+            metaPrimary: `${matchedArchive.location ?? 'Online'} • ${matchedArchive.startTime ?? '09:00 WIB'}`,
+            metaSecondary:
+              (matchedArchive.price ?? 0) === 0
+                ? 'Gratis (Terbuka untuk Komunitas)'
+                : formatRupiah(matchedArchive.price ?? 0),
+          });
+          return;
+        }
+      }
+
+      // Jika klik tombol tapi tidak cocok
+      if (button) {
+        const btnText = (button.textContent || '').trim();
+        if (
+          btnText.includes('Keranjang') ||
+          btnText.includes('Daftar') ||
+          btnText.includes('Terdaftar')
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    }
+  }
+
   return (
-    <div className="mx-auto flex w-full">
-      {/* Sidebar Khusus Homepage */}
-      <HomepageSidebar />
+    <div className="w-full relative">
+      {/* Banner Navigasi Khusus Mode Live Homepage (Mode Preview) */}
+      {isLivePreview && !detailModalItem && (
+        <div className="sticky top-[64px] z-30 border-b border-amber-300 bg-amber-50/95 backdrop-blur px-4 py-2.5 shadow-sm">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-amber-950">
+              <Eye className="h-4 w-4 shrink-0 text-amber-700" />
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                Mode Live Homepage (Mode Preview)
+              </span>
+              <span className="hidden sm:inline text-xs text-amber-800">
+                • Klik Artikel, Produk, Jasa, atau Event untuk melihat pratinjau detail ukuran penuh.
+              </span>
+            </div>
+            <Link
+              href={returnHref}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Kembali ke Dashboard
+            </Link>
+          </div>
+        </div>
+      )}
 
-      {/* Konten Utama Beranda */}
-      <div className="flex-1 min-w-0">
-        {/* 1. Hero Carousel */}
-        <HeroCarousel />
+      <div className="mx-auto flex w-full relative">
+        {/* Konten Utama Beranda (HomepageSidebar dihapus sepenuhnya demi keamanan anti-crack) */}
+        <div className="flex-1 min-w-0" onClickCapture={handlePreviewClickCapture}>
+          {/* Notifikasi Mengambang Jika Mencoba Mengakses Fitur Ubah pada Mode Live Preview */}
+          {isLivePreview && previewNotice && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[130] max-w-xl w-[92%] rounded-2xl border border-amber-400 bg-slate-900/95 px-5 py-3.5 text-white shadow-2xl flex items-center gap-3">
+              <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0" />
+              <p className="text-xs leading-relaxed flex-1">{previewNotice}</p>
+              <button
+                type="button"
+                onClick={() => setPreviewNotice(null)}
+                className="rounded-lg p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
-        <Divider />
+          {/* 1. Hero Carousel */}
+          <HeroCarousel />
 
-        {/* 2. Artikel & Jurnal Khusus Beranda (Berdasarkan Page Artikel) */}
-        <HomepageArticles />
+          <Divider />
 
-        <Divider />
+          {/* 2. Artikel & Jurnal Khusus Beranda */}
+          <HomepageArticles />
 
-        {/* 3. Marketplace Khusus Beranda (Berdasarkan Page Marketplace) */}
-        <HomepageMarketplace />
+          <Divider />
 
-        <Divider />
+          {/* 3. Marketplace Khusus Beranda */}
+          <HomepageMarketplace />
 
-        {/* 4. Layanan Jasa & Service Provider Khusus Beranda (Berdasarkan Page Service-Provider) */}
-        <HomepageServices />
+          <Divider />
 
-        <Divider />
+          {/* 4. Layanan Jasa & Service Provider Khusus Beranda */}
+          <HomepageServices />
 
-        {/* 5. Agenda & Event Khusus Beranda (Berdasarkan Page Events) */}
-        <HomepageEvents />
+          <Divider />
 
-        <Divider />
+          {/* 5. Agenda & Event Khusus Beranda */}
+          <HomepageEvents />
 
-        {/* 6. 🔧 Dev Bypass Panel — Akses Semua Dashboard */}
-        <DevBypassPanel />
+          <Divider />
 
-        <Divider />
+          {/* 6. Dev Bypass Panel — Disembunyikan saat Mode Live Homepage (Tidak Ada Akses Pindah Role) */}
+          {!isLivePreview && (
+            <>
+              <DevBypassPanel />
+              <Divider />
+            </>
+          )}
 
-        {/* 7. More Stories */}
-        <MoreStoriesSection />
+          {/* 7. More Stories */}
+          <MoreStoriesSection />
 
-        <Divider />
+          <Divider />
 
-        {/* 7. Newsletter */}
-        <NewsletterSection />
+          {/* 8. Newsletter */}
+          <NewsletterSection />
+        </div>
+
+        {/* ── HALAMAN LIVE DETAIL EVENT UKURAN PENUH (SAAT KLIK EVENT DI MODE LIVE HOMEPAGE) ── */}
+        {isLivePreview && detailModalItem && (
+          <div className="fixed inset-0 top-[98px] z-[120] overflow-y-auto bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-6xl mx-auto space-y-6 pb-16">
+              {/* Banner Keterangan Mode Live Homepage (Mode Preview) */}
+              <div className="rounded-2xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-950 via-indigo-900 to-slate-900 p-4 sm:p-5 text-white shadow-lg">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/20 border border-amber-300/40 text-amber-300">
+                      <Eye className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-950">
+                          <Lock className="h-3 w-3" /> MODE LIVE HOMEPAGE (MODE PREVIEW)
+                        </span>
+                        <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-200">
+                          Tampilan Live Detail Agenda Event Ukuran Penuh • Akses Mengubah & Pendaftaran Dibatasi
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs text-indigo-100 leading-relaxed">
+                        Anda sedang meninjau halaman <strong>Live Detail Agenda & Event</strong> ukuran penuh. Pada mode pratinjau ini, tombol pendaftaran peserta dan pengubahan data dikunci.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDetailModalItem(null)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 border border-white/25 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/25 transition"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Kembali ke Live Homepage
+                    </button>
+                    <Link
+                      href={returnHref}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3.5 py-2 text-xs font-extrabold text-slate-950 hover:bg-amber-300 transition shadow-sm"
+                    >
+                      Kembali ke Dashboard
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid Halaman Live Detail Event (8 Kolom Kiri + 4 Kolom Kanan) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Sisi Kiri: Visual Hero, Ringkasan, dan Deskripsi Lengkap */}
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                    <div className="aspect-[21/9] w-full rounded-2xl overflow-hidden bg-slate-100 relative">
+                      <img
+                        src={detailModalItem.image}
+                        alt={detailModalItem.title}
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80';
+                        }}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute top-4 left-4 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow">
+                        {detailModalItem.badge}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+                        {detailModalItem.title}
+                      </h1>
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+                          <MapPin className="h-4 w-4 text-emerald-600" />
+                          {detailModalItem.metaPrimary}
+                        </span>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-700">
+                          <Calendar className="h-4 w-4" />
+                          Terverifikasi Moderator Editorial
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Tayang */}
+                    <div className="rounded-2xl border-l-4 border-emerald-600 bg-emerald-50/60 p-5 space-y-1">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
+                        Ringkasan Agenda (Excerpt)
+                      </span>
+                      <p className="text-sm sm:text-base text-slate-800 leading-relaxed">
+                        {detailModalItem.summary}
+                      </p>
+                    </div>
+
+                    {/* Deskripsi Lengkap */}
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Deskripsi Lengkap & Materi Kegiatan
+                      </h3>
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 text-sm sm:text-base text-slate-700 leading-relaxed whitespace-pre-line">
+                        {detailModalItem.fullDescription}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sisi Kanan: Kartu Penyelenggara & Pendaftaran (Dikunci pada Mode Preview) */}
+                <div className="lg:col-span-4 space-y-6 sticky top-6">
+                  <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
+                    <div>
+                      <span className="text-xs text-slate-400 font-medium">Biaya Kepesertaan</span>
+                      <p className="text-2xl font-extrabold text-emerald-700 mt-1">
+                        {detailModalItem.metaSecondary}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Narasumber / Penyelenggara
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <p className="text-sm font-bold text-slate-900">
+                          {detailModalItem.subtitle}
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5 pt-1">
+                        <Users className="h-3.5 w-3.5 text-slate-400" />
+                        Terbuka untuk Anggota & Komunitas Racik Media
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2">
+                      <Lock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Mode Live Homepage (Mode Preview):</strong> Pendaftaran peserta dan pengubahan jadwal dibatasi pada mode pratinjau ini.
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3.5 px-4 rounded-xl bg-slate-200 text-slate-500 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-not-allowed"
+                    >
+                      <Lock className="h-4 w-4" />
+                      Pendaftaran Dibatasi (Mode Preview)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDetailModalItem(null)}
+                      className="w-full py-3 px-4 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center justify-center gap-2 transition"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Kembali ke Live Homepage
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

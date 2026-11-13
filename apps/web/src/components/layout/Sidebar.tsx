@@ -9,27 +9,38 @@ import {
   BadgeCheck,
   Bookmark,
   BriefcaseBusiness,
+  Calendar,
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   CreditCard,
+  FileCheck2,
+  Headphones,
   LayoutDashboard,
   Lock,
   LogOut,
+  MessageSquare,
   Newspaper,
+  Package,
   PackageSearch,
   PenLine,
   Plus,
+  Radio,
+  Scale,
   ShieldAlert,
   ShieldCheck,
+  Sliders,
+  Sparkles,
   Store,
   Truck,
-  UserRound,
+  Wallet,
+  Wrench,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
+import { usePartnerChats } from '@/lib/partner-chat-store';
 
 export type DashboardRoleKey =
   | 'member'
@@ -51,6 +62,7 @@ type NavItem = {
   href: string;
   icon: typeof LayoutDashboard;
   dashboardKey?: string;
+  useCustomIcon?: boolean;
 };
 
 /**
@@ -68,8 +80,11 @@ const dashboardThemeByKey: Record<
     rowBg: string;
     rowActiveBg: string;
     iconBg: string;
+    sidebarFrame: string;
     badgeClass: string;
     dotClass: string;
+    orbAClass: string;
+    orbBClass: string;
   }
 > = {
   member: {
@@ -80,8 +95,11 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100',
     rowActiveBg: 'bg-emerald-100 text-emerald-950 border border-emerald-400 font-bold shadow-sm',
     iconBg: 'bg-emerald-600 text-white shadow-sm',
-    badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-    dotClass: 'bg-emerald-500',
+    sidebarFrame: 'border-2 border-emerald-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-emerald-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-emerald-300/50 backdrop-blur-sm',
+    dotClass: 'bg-emerald-400',
+    orbAClass: 'bg-emerald-400/30',
+    orbBClass: 'bg-teal-400/30',
   },
   master_admin: {
     roleKey: 'master_admin',
@@ -91,19 +109,25 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100',
     rowActiveBg: 'bg-purple-100 text-purple-950 border border-purple-400 font-bold shadow-sm',
     iconBg: 'bg-purple-600 text-white shadow-sm',
-    badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
-    dotClass: 'bg-purple-600',
+    sidebarFrame: 'border-2 border-purple-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-purple-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-purple-300/50 backdrop-blur-sm',
+    dotClass: 'bg-purple-400',
+    orbAClass: 'bg-purple-400/30',
+    orbBClass: 'bg-indigo-400/30',
   },
   admin: {
     roleKey: 'admin',
     label: 'Dashboard Admin',
-    shortDesc: 'Verifikasi mitra & laporan keuangan',
-    href: '/admin/dashboard',
+    shortDesc: 'Administrasi dokumen, pengajuan seller/distributor, komplain & legalitas',
+    href: '/admin/administration',
     rowBg: 'bg-violet-50 text-violet-900 border border-violet-200 hover:bg-violet-100',
     rowActiveBg: 'bg-violet-100 text-violet-950 border border-violet-400 font-bold shadow-sm',
     iconBg: 'bg-violet-600 text-white shadow-sm',
-    badgeClass: 'bg-violet-50 text-violet-800 border-violet-200',
-    dotClass: 'bg-violet-500',
+    sidebarFrame: 'border-2 border-violet-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-violet-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-violet-300/50 backdrop-blur-sm',
+    dotClass: 'bg-violet-400',
+    orbAClass: 'bg-violet-400/30',
+    orbBClass: 'bg-indigo-400/30',
   },
   seller: {
     roleKey: 'seller',
@@ -113,8 +137,11 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100',
     rowActiveBg: 'bg-amber-100 text-amber-950 border border-amber-400 font-bold shadow-sm',
     iconBg: 'bg-amber-500 text-white shadow-sm',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
-    dotClass: 'bg-amber-500',
+    sidebarFrame: 'border-2 border-amber-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-amber-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-amber-300/50 backdrop-blur-sm',
+    dotClass: 'bg-amber-400',
+    orbAClass: 'bg-amber-400/30',
+    orbBClass: 'bg-emerald-400/30',
   },
   'service-provider': {
     roleKey: 'service-provider',
@@ -124,8 +151,11 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100',
     rowActiveBg: 'bg-sky-100 text-sky-950 border border-sky-400 font-bold shadow-sm',
     iconBg: 'bg-sky-600 text-white shadow-sm',
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
-    dotClass: 'bg-sky-500',
+    sidebarFrame: 'border-2 border-sky-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-sky-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-sky-300/50 backdrop-blur-sm',
+    dotClass: 'bg-sky-400',
+    orbAClass: 'bg-sky-400/30',
+    orbBClass: 'bg-emerald-400/30',
   },
   author: {
     roleKey: 'author',
@@ -135,8 +165,11 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100',
     rowActiveBg: 'bg-teal-100 text-teal-950 border border-teal-400 font-bold shadow-sm',
     iconBg: 'bg-teal-600 text-white shadow-sm',
-    badgeClass: 'bg-teal-50 text-teal-800 border-teal-200',
-    dotClass: 'bg-teal-500',
+    sidebarFrame: 'border-2 border-teal-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-teal-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-teal-300/50 backdrop-blur-sm',
+    dotClass: 'bg-teal-400',
+    orbAClass: 'bg-teal-400/30',
+    orbBClass: 'bg-emerald-400/30',
   },
   distributor: {
     roleKey: 'distributor',
@@ -146,29 +179,35 @@ const dashboardThemeByKey: Record<
     rowBg: 'bg-cyan-50 text-cyan-900 border border-cyan-200 hover:bg-cyan-100',
     rowActiveBg: 'bg-cyan-100 text-cyan-950 border border-cyan-400 font-bold shadow-sm',
     iconBg: 'bg-cyan-600 text-white shadow-sm',
-    badgeClass: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-    dotClass: 'bg-cyan-500',
+    sidebarFrame: 'border-2 border-cyan-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-cyan-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-cyan-300/50 backdrop-blur-sm',
+    dotClass: 'bg-cyan-400',
+    orbAClass: 'bg-cyan-400/30',
+    orbBClass: 'bg-emerald-400/30',
   },
   moderator: {
     roleKey: 'moderator',
     label: 'Dashboard Moderator',
-    shortDesc: 'Kurasi konten artikel & peninjauan produk',
+    shortDesc: 'Naungan author, arsip tulisan, event & kurasi homepage',
     href: '/admin/moderation',
     rowBg: 'bg-indigo-50 text-indigo-900 border border-indigo-200 hover:bg-indigo-100',
     rowActiveBg: 'bg-indigo-100 text-indigo-950 border border-indigo-400 font-bold shadow-sm',
     iconBg: 'bg-indigo-600 text-white shadow-sm',
-    badgeClass: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-    dotClass: 'bg-indigo-500',
+    sidebarFrame: 'border-2 border-indigo-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-indigo-300/40 backdrop-blur-sm',
+    badgeClass: 'bg-slate-950/60 text-white border-indigo-300/50 backdrop-blur-sm',
+    dotClass: 'bg-indigo-400',
+    orbAClass: 'bg-indigo-400/30',
+    orbBClass: 'bg-sky-400/30',
   },
 };
 
 const masterSwitchableDashboards = [
-  dashboardThemeByKey.member,
+  dashboardThemeByKey.admin,
+  dashboardThemeByKey.moderator,
   dashboardThemeByKey.seller,
   dashboardThemeByKey['service-provider'],
-  dashboardThemeByKey.author,
   dashboardThemeByKey.distributor,
-  dashboardThemeByKey.moderator,
+  dashboardThemeByKey.member,
 ];
 
 const navByRole: Record<string, NavItem[]> = {
@@ -182,11 +221,10 @@ const navByRole: Record<string, NavItem[]> = {
     { label: 'Marketplace', href: '/marketplace', icon: Store },
     { label: 'Jasa', href: '/services', icon: BriefcaseBusiness },
     { label: 'Artikel', href: '/articles', icon: Newspaper },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
     { label: 'Bookmark', href: '/bookmarks', icon: Bookmark },
     { label: 'Pesanan Saya', href: '/orders', icon: Truck },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=member', icon: ShieldCheck },
   ],
   user: [
     {
@@ -198,11 +236,10 @@ const navByRole: Record<string, NavItem[]> = {
     { label: 'Marketplace', href: '/marketplace', icon: Store },
     { label: 'Jasa', href: '/services', icon: BriefcaseBusiness },
     { label: 'Artikel', href: '/articles', icon: Newspaper },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
     { label: 'Bookmark', href: '/bookmarks', icon: Bookmark },
     { label: 'Pesanan Saya', href: '/orders', icon: Truck },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=member', icon: ShieldCheck },
   ],
   author: [
     {
@@ -214,8 +251,8 @@ const navByRole: Record<string, NavItem[]> = {
     { label: 'Tulis Artikel', href: '/articles/write', icon: PenLine },
     { label: 'Koleksi Artikel', href: '/articles', icon: Newspaper },
     { label: 'Bookmark', href: '/bookmarks', icon: Bookmark },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=moderator', icon: ShieldCheck },
   ],
   seller: [
     {
@@ -224,11 +261,17 @@ const navByRole: Record<string, NavItem[]> = {
       icon: LayoutDashboard,
       dashboardKey: 'seller',
     },
+    {
+      label: 'Dashboard Member',
+      href: '/dashboard?layer=marketplace&from=seller',
+      icon: LayoutDashboard,
+      dashboardKey: 'member',
+    },
     { label: 'Produk Saya', href: '/seller/products', icon: PackageSearch },
-    { label: 'Tambah Produk', href: '/seller/products/new', icon: Plus },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Pesanan Toko', href: '/seller/orders', icon: Package },
+    { label: 'Keuangan / Saldo', href: '/seller/finance', icon: Wallet },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=seller', icon: ShieldCheck },
   ],
   distributor: [
     {
@@ -237,10 +280,16 @@ const navByRole: Record<string, NavItem[]> = {
       icon: LayoutDashboard,
       dashboardKey: 'distributor',
     },
-    { label: 'Pesanan & Pengiriman', href: '/orders', icon: Truck },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    {
+      label: 'Dashboard Member',
+      href: '/dashboard?layer=marketplace&from=distributor',
+      icon: LayoutDashboard,
+      dashboardKey: 'member',
+    },
+    { label: 'Pesanan Toko', href: '/distributor/orders', icon: Package },
+    { label: 'Keuangan / Saldo', href: '/distributor/finance', icon: Wallet },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=distributor', icon: ShieldCheck },
   ],
   'service-provider': [
     {
@@ -249,10 +298,19 @@ const navByRole: Record<string, NavItem[]> = {
       icon: LayoutDashboard,
       dashboardKey: 'service-provider',
     },
+    {
+      label: 'Dashboard Member',
+      href: '/dashboard?layer=marketplace&from=service-provider',
+      icon: LayoutDashboard,
+      dashboardKey: 'member',
+    },
+    { label: 'Kelola Jasa Saya', href: '/service-provider/services', icon: Wrench },
+    { label: 'Tambah Jasa Baru', href: '/service-provider/services/new', icon: Plus },
+    { label: 'Pesanan Toko', href: '/service-provider/orders', icon: Package },
+    { label: 'Keuangan / Saldo', href: '/service-provider/finance', icon: Wallet },
     { label: 'Katalog Layanan', href: '/services', icon: BriefcaseBusiness },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Profil Saya', href: '/profile', icon: UserRound },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=service-provider', icon: ShieldCheck },
   ],
   moderator: [
     {
@@ -262,32 +320,45 @@ const navByRole: Record<string, NavItem[]> = {
       dashboardKey: 'moderator',
     },
     { label: 'Koleksi Artikel', href: '/articles', icon: Newspaper },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Koleksi Event', href: '/events', icon: Calendar },
+    { label: 'Live Chat ke Master Admin', href: '/admin/chat-master?role=moderator', icon: Radio },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=moderator', icon: ShieldCheck },
   ],
   admin: [
     {
       label: 'Dashboard Admin',
-      href: '/admin/dashboard',
+      href: '/admin/administration',
       icon: LayoutDashboard,
       dashboardKey: 'admin',
     },
-    { label: 'Verifikasi Seller', href: '/admin/seller-verification', icon: BadgeCheck },
-    { label: 'Laporan Keuangan', href: '/admin/financial-report', icon: CreditCard },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Pusat Bantuan & Tiket Member', href: '/admin/helpdesk', icon: Headphones },
+    { label: 'Siklus Akun & KYB', href: '/admin/seller-verification', icon: BadgeCheck },
+    { label: 'Sengketa & Eskalasi', href: '/admin/administration?tab=complaints', icon: Scale },
+    { label: 'Legalitas & Retensi 2 Thn', href: '/admin/administration?tab=legality', icon: FileCheck2 },
+    { label: 'B2B & Armada STNK/KIR', href: '/admin/administration?tab=b2b_fleet', icon: Truck },
+    { label: 'Hold Escrow & Royalti Bot', href: '/admin/administration?tab=escrow_royalty', icon: CreditCard },
+    { label: 'Audit Trail Permanen', href: '/admin/administration?tab=audit_trail', icon: ShieldAlert },
+    { label: 'Live Chat ke Master Admin', href: '/admin/chat-master', icon: Radio },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=admin', icon: ShieldCheck },
   ],
   master_admin: [
-    { label: 'Antrean Moderasi', href: '/admin/moderation', icon: ClipboardCheck },
-    { label: 'Verifikasi Seller', href: '/admin/seller-verification', icon: BadgeCheck },
-    { label: 'Laporan Keuangan', href: '/admin/financial-report', icon: CreditCard },
-    { label: 'Tulis Ide & Cerita', href: '/articles/write', icon: PenLine },
-    { label: 'Kebijakan', href: '/kebijakan', icon: ShieldCheck },
+    { label: 'Laporan Keuangan & Escrow', href: '/admin/financial-report', icon: CreditCard },
+    { label: 'Pengaturan Algoritma Penjualan (AI)', href: '/admin/algorithm-settings', icon: Sliders },
+    { label: 'Akses Skill AI (Bantuan Admin)', href: '/admin/ai-skills', icon: Sparkles },
+    { label: 'Pantau Administrasi (Admin)', href: '/admin/administration', icon: BadgeCheck },
+    { label: 'Pantau Moderasi (Moderator)', href: '/admin/moderation', icon: ClipboardCheck },
+    { label: 'Live Chat Tim (Admin & Moderator)', href: '/admin/chat-master', icon: Radio },
+    { label: 'Riwayat Chat', href: '/chat', icon: MessageSquare },
+    { label: 'Kebijakan', href: '/kebijakan?role=master_admin', icon: ShieldCheck },
   ],
 };
 
+navByRole.service_provider = navByRole['service-provider'];
+
 function normalizeRoleKey(rawRole: string | null | undefined): string {
-  if (!rawRole || rawRole === 'user' || rawRole === 'buyer') return 'member';
+  if (!rawRole || rawRole === 'user' || rawRole === 'buyer' || rawRole === 'author') return 'member';
   if (rawRole === 'service_provider' || rawRole === 'expert') return 'service-provider';
   if (rawRole === 'super_admin') return 'master_admin';
   return rawRole;
@@ -295,13 +366,33 @@ function normalizeRoleKey(rawRole: string | null | undefined): string {
 
 function detectStrictDashboardRoleFromPath(pathname: string): string | null {
   if (pathname.startsWith('/admin/moderation')) return 'moderator';
+  if (pathname.startsWith('/author')) return 'author';
+  if (
+    pathname.startsWith('/admin/administration') ||
+    pathname.startsWith('/admin/seller-verification') ||
+    pathname.startsWith('/admin/helpdesk')
+  ) {
+    return 'admin';
+  }
+  if (pathname.startsWith('/admin/ai-skills')) return 'master_admin';
+  if (pathname.startsWith('/admin/chat-master')) return null;
   if (pathname.startsWith('/admin')) return 'master_admin';
   if (pathname.startsWith('/seller') && !pathname.startsWith('/seller/register')) return 'seller';
   if (pathname.startsWith('/distributor')) return 'distributor';
   if (pathname.startsWith('/service-provider')) return 'service-provider';
-  if (pathname.startsWith('/author')) return 'author';
   if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return 'member';
   return null;
+}
+
+function isPartnerDashboardRole(roleKey: string | null | undefined): roleKey is 'seller' | 'distributor' | 'service-provider' {
+  return roleKey === 'seller' || roleKey === 'distributor' || roleKey === 'service-provider';
+}
+
+function getRegistrationTargetForDashboard(targetDashboardRole: string): string {
+  if (targetDashboardRole === 'seller') return '/seller/register';
+  if (targetDashboardRole === 'distributor') return '/seller/register?role=distributor';
+  if (targetDashboardRole === 'service-provider') return '/services/apply';
+  return '/dashboard';
 }
 
 function isAuthorizedForDashboard(verifiedRoles: string[], targetDashboardRole: string): boolean {
@@ -331,6 +422,7 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
   const { session, loading: authLoading } = useAuth();
   const userId = session?.user.id;
   const popupRef = useRef<HTMLDivElement>(null);
+  const isLoggingOutRef = useRef(false);
 
   const isDevEnvironment =
     process.env.NODE_ENV === 'development' &&
@@ -345,15 +437,66 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
       }),
   });
   const bookmarkCount = bookmarksData?.data?.total ?? bookmarksData?.data?.items.length;
+  const { threads: chatThreads } = usePartnerChats();
 
   const [expanded, setExpanded] = useState(true);
   const [sidebarReady, setSidebarReady] = useState(false);
   const [activeRole, setActiveRole] = useState<string>(() => {
     return detectStrictDashboardRoleFromPath(pathname) ?? normalizeRoleKey(role);
   });
-  const [verifiedRoles, setVerifiedRoles] = useState<string[]>(['member', 'master_admin']);
+  const [verifiedRoles, setVerifiedRoles] = useState<string[]>(['member']);
   const [accessDenied, setAccessDenied] = useState(false);
   const [showMasterPopup, setShowMasterPopup] = useState(false);
+  const [isLivePreview, setIsLivePreview] = useState(false);
+  const [hasDevMasterStorage, setHasDevMasterStorage] = useState(false);
+  const [savedPartnerRole, setSavedPartnerRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    setIsLivePreview(params.get('mode') === 'live-preview');
+
+    function syncDevMaster() {
+      const hasMaster = window.localStorage.getItem('racik-dev-master') === 'true';
+      setHasDevMasterStorage(hasMaster);
+
+      const pathRole = detectStrictDashboardRoleFromPath(pathname);
+      const fromParamRaw = new URLSearchParams(window.location.search).get('from');
+      const fromParam = fromParamRaw ? normalizeRoleKey(fromParamRaw) : null;
+      const rawDevRole = window.localStorage.getItem('racik-dev-role');
+      const normDev = rawDevRole ? normalizeRoleKey(rawDevRole) : null;
+
+      if (isPartnerDashboardRole(pathRole) && !(normDev === 'member' && !hasMaster)) {
+        window.localStorage.setItem('racik-partner-origin-role', pathRole);
+        setSavedPartnerRole(pathRole);
+        return;
+      }
+
+      if (isPartnerDashboardRole(fromParam) && !(normDev === 'member' && !hasMaster)) {
+        window.localStorage.setItem('racik-partner-origin-role', fromParam);
+        setSavedPartnerRole(fromParam);
+        return;
+      }
+
+      const originStored = normalizeRoleKey(
+        window.localStorage.getItem('racik-partner-origin-role'),
+      );
+      if (isPartnerDashboardRole(originStored)) {
+        setSavedPartnerRole(originStored);
+      } else if (isPartnerDashboardRole(normDev)) {
+        setSavedPartnerRole(normDev);
+      } else {
+        setSavedPartnerRole(null);
+      }
+    }
+    syncDevMaster();
+    window.addEventListener('racik-dev-role-change', syncDevMaster);
+    window.addEventListener('storage', syncDevMaster);
+    return () => {
+      window.removeEventListener('racik-dev-role-change', syncDevMaster);
+      window.removeEventListener('storage', syncDevMaster);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem('racik-sidebar-expanded');
@@ -394,35 +537,55 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
   }, [showMasterPopup]);
 
   useEffect(() => {
+    if (isLoggingOutRef.current) return;
     const pathDashboardRole = detectStrictDashboardRoleFromPath(pathname);
 
     // 1. Mode Development Bypass (aktif di lokal saat NEXT_PUBLIC_DISABLE_AUTH=true)
     if (!userId || isDevEnvironment) {
       if (!isDevEnvironment && !userId) {
-        setAccessDenied(Boolean(pathDashboardRole && pathDashboardRole !== 'member'));
+        const denied = Boolean(pathDashboardRole && pathDashboardRole !== 'member');
+        setAccessDenied(denied);
         setActiveRole('member');
         setVerifiedRoles(['member']);
+        if (denied && pathDashboardRole) {
+          router.replace('/');
+        }
         return;
       }
 
       const syncDevelopmentRole = () => {
+        if (isLoggingOutRef.current) return;
+
+        const hasDevMaster = window.localStorage.getItem('racik-dev-master') === 'true';
         const savedRaw = window.localStorage.getItem('racik-dev-role');
         const savedRole = savedRaw ? normalizeRoleKey(savedRaw) : null;
 
-        // Di mode dev, otoritas Master Admin selalu disertakan agar pengguna dapat
-        // berpindah antar dashboard dan kembali ke Dashboard Master Admin kapan saja.
-        const owned = new Set<string>(['member', 'master_admin']);
-        if (savedRole) owned.add(savedRole);
-        if (pathDashboardRole) owned.add(pathDashboardRole);
+        // Tidak boleh ada bypass dari parameter URL (?role=...) maupun saat sesi belum login (!savedRole).
+        const owned = new Set<string>(['member']);
+        if (hasDevMaster || savedRole === 'master_admin') {
+          owned.add('master_admin');
+          if (savedRole) owned.add(savedRole);
+          if (pathDashboardRole) owned.add(pathDashboardRole);
+        } else if (savedRole) {
+          owned.add(savedRole);
+        }
 
-        setVerifiedRoles(Array.from(owned));
+        const ownedList = Array.from(owned);
+        setVerifiedRoles(ownedList);
+
+        if (pathDashboardRole && !isAuthorizedForDashboard(ownedList, pathDashboardRole)) {
+          setAccessDenied(true);
+          setActiveRole('member');
+          router.replace('/');
+          return;
+        }
 
         if (pathDashboardRole) {
           setActiveRole(pathDashboardRole);
         } else if (savedRole && savedRole in navByRole) {
           setActiveRole(savedRole);
         } else {
-          setActiveRole(normalizeRoleKey(role));
+          setActiveRole('member');
         }
         setAccessDenied(false);
       };
@@ -454,7 +617,7 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
 
       if (userCheck.error || !userCheck.data.user) {
         setAccessDenied(true);
-        router.replace('/login');
+        router.replace('/');
         return;
       }
 
@@ -480,10 +643,16 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
         if (!authorized) {
           setAccessDenied(true);
           setActiveRole('member');
-          const safeTarget =
-            dashboardThemeByKey[primaryRole]?.href ?? '/dashboard';
+          const safeTarget = isPartnerDashboardRole(pathDashboardRole)
+            ? getRegistrationTargetForDashboard(pathDashboardRole)
+            : (dashboardThemeByKey[primaryRole]?.href ?? '/dashboard');
           router.replace(safeTarget);
           return;
+        }
+
+        if (isPartnerDashboardRole(pathDashboardRole) && typeof window !== 'undefined') {
+          window.localStorage.setItem('racik-partner-origin-role', pathDashboardRole);
+          setSavedPartnerRole(pathDashboardRole);
         }
 
         setAccessDenied(false);
@@ -508,7 +677,10 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
     };
   }, [userId, isDevEnvironment, role, pathname, router]);
 
-  const hasMasterAuthority = verifiedRoles.includes('master_admin');
+  const hasMasterAuthority =
+    verifiedRoles.includes('master_admin') ||
+    activeRole === 'master_admin' ||
+    hasDevMasterStorage;
   const highestOwnedRole = pickHighestVerifiedRole(verifiedRoles);
   const items = navByRole[activeRole] ?? navByRole.member;
   const badgeMeta = dashboardThemeByKey[activeRole] ?? dashboardThemeByKey.member;
@@ -519,6 +691,17 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
     if (typeof window !== 'undefined') {
       const storageRole =
         targetRoleKey === 'service-provider' ? 'service_provider' : targetRoleKey;
+      if (isPartnerDashboardRole(targetRoleKey)) {
+        window.localStorage.setItem('racik-partner-origin-role', targetRoleKey);
+      } else if (targetRoleKey === 'member') {
+        if (isPartnerDashboardRole(activeRole)) {
+          window.localStorage.setItem('racik-partner-origin-role', activeRole);
+        } else {
+          window.localStorage.removeItem('racik-partner-origin-role');
+        }
+      } else {
+        window.localStorage.removeItem('racik-partner-origin-role');
+      }
       window.localStorage.setItem('racik-dev-role', storageRole);
       window.localStorage.setItem('racik-dev-master', 'true');
       window.dispatchEvent(new Event('racik-dev-role-change'));
@@ -529,27 +712,55 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
   }
 
   async function handleLogout() {
+    isLoggingOutRef.current = true;
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('racik-dev-role');
       window.localStorage.removeItem('racik-dev-master');
+      window.localStorage.removeItem('racik-partner-origin-role');
     }
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // abaikan error koneksi saat sign out
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    } else {
+      router.push('/');
+    }
+  }
+
+  // Anti-Crack: Pada Mode Live Homepage (Mode Preview) atau Penampil PDF Terisolasi, Sidebar tidak dirender sama sekali di DOM
+  if (isLivePreview || pathname.startsWith('/admin/document-viewer')) {
+    return null;
   }
 
   return (
     <aside
-      className={`fixed bottom-0 left-0 top-[64px] z-30 shrink-0 overflow-visible border-r border-gray-200 bg-white shadow-lg ${
+      className={`dashboard-hero-slow select-none relative isolate fixed bottom-0 left-0 top-[64px] z-30 shrink-0 overflow-visible border-r border-white/20 text-white shadow-xl ${
         sidebarReady ? 'transition-[width] duration-300 ease-in-out' : 'transition-none'
-      } md:sticky md:top-[64px] md:z-auto md:h-[calc(100vh-64px)] md:self-start md:shadow-none ${
-        expanded ? 'w-[228px]' : 'w-[68px]'
+      } md:sticky md:top-[64px] md:z-auto md:h-[calc(100vh-64px)] md:self-start ${
+        expanded ? 'w-[236px]' : 'w-[68px]'
       }`}
     >
-      <nav className="flex h-full flex-col px-1.5 pb-2 pt-2">
+      {/* Lapisan Animasi Hero Dashboard (terklip rapi di dalam sidebar agar tooltip & popup tetap terlihat) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div
+          className={`dashboard-hero-orb-a absolute -left-16 -top-16 h-60 w-60 rounded-full blur-3xl ${badgeMeta.orbAClass}`}
+        />
+        <div
+          className={`dashboard-hero-orb-b absolute -bottom-20 -right-12 h-64 w-64 rounded-full blur-3xl ${badgeMeta.orbBClass}`}
+        />
+        <div className="dashboard-hero-grid-drift absolute inset-0 opacity-20" />
+      </div>
+
+      <nav className="relative z-10 flex h-full flex-col px-2 pb-3 pt-2.5">
         {/* Header Status Role Dashboard Aktif */}
         <div
-          className={`mb-2 flex items-center rounded-lg border px-2.5 py-1.5 ${badgeMeta.badgeClass} ${
+          className={`mb-2.5 flex items-center rounded-lg border px-2.5 py-1.5 ${badgeMeta.badgeClass} ${
             expanded ? 'justify-between gap-2' : 'justify-center px-1'
           }`}
           title={`Role Dashboard Aktif: ${badgeMeta.label}`}
@@ -571,8 +782,8 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
         </div>
 
         {accessDenied && !authLoading ? (
-          <div className="my-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-center text-xs text-rose-700">
-            <ShieldAlert className="mx-auto mb-1.5 h-5 w-5 text-rose-600" />
+          <div className="my-4 rounded-lg border border-rose-500/40 bg-rose-950/60 p-3 text-center text-xs text-rose-200">
+            <ShieldAlert className="mx-auto mb-1.5 h-5 w-5 text-rose-400" />
             {expanded && (
               <p className="font-semibold">
                 Akses Ditolak. Mengalihkan ke dashboard resmi Anda...
@@ -581,51 +792,62 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
           </div>
         ) : (
           <div className="space-y-1.5 overflow-visible pr-0.5">
-            {/* ── BAGIAN ATAS: ICON DASHBOARD MASTER ADMIN (POP-UP PILIH ROLE) ── */}
+            {/* ── BAGIAN ATAS: ICON DASHBOARD MASTER ADMIN / KEMBALI KE DASHBOARD MITRA ── */}
             {(hasMasterAuthority ||
               (activeRole === 'member' &&
-                highestOwnedRole !== 'member' &&
-                Boolean(dashboardThemeByKey[highestOwnedRole]))) && (
-              <div className="space-y-1.5 border-b border-gray-100 pb-2">
+                ((highestOwnedRole !== 'member' &&
+                  Boolean(dashboardThemeByKey[highestOwnedRole])) ||
+                  Boolean(savedPartnerRole && dashboardThemeByKey[savedPartnerRole])))) && (
+              <div className="space-y-1 border-b border-white/20 pb-2">
                 {/* Icon Dashboard Master Admin + Pop-up Sidebar Pemilih Role Dashboard */}
                 {hasMasterAuthority && (
                 <div ref={popupRef} className="relative">
                   <button
                     type="button"
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
                     onClick={() => setShowMasterPopup((prev) => !prev)}
                     aria-expanded={showMasterPopup}
                     aria-label="Dashboard Master Admin — Buka Pop-up Pilih Role Dashboard"
-                    className={`group relative flex h-10 w-full items-center rounded-lg text-left text-xs font-semibold transition ${
-                      expanded ? 'gap-2.5 px-2' : 'justify-center px-1'
+                    className={`select-none group relative flex w-full items-center rounded-xl text-left text-xs transition ${
+                      expanded ? 'gap-2.5 px-2.5 py-2' : 'justify-center px-1.5 py-2'
                     } ${
-                      isMasterDashboardActive || showMasterPopup
-                        ? dashboardThemeByKey.master_admin.rowActiveBg
-                        : dashboardThemeByKey.master_admin.rowBg
+                      isMasterDashboardActive
+                        ? dashboardThemeByKey.master_admin.sidebarFrame
+                        : showMasterPopup
+                          ? 'bg-white/15 text-white'
+                          : 'border border-transparent text-white/90 hover:bg-white/15 hover:text-white'
                     }`}
                   >
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${dashboardThemeByKey.master_admin.iconBg}`}
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                    </span>
+                    {isMasterDashboardActive ? (
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/25 ${dashboardThemeByKey.master_admin.iconBg}`}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <LayoutDashboard className="h-5 w-5 shrink-0 text-purple-300" />
+                    )}
                     {expanded && (
                       <div className="flex min-w-0 flex-1 items-center justify-between gap-1">
-                        <span className="truncate">Dashboard Master</span>
-                        <span className="rounded bg-purple-200 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-tight text-purple-900">
+                        <span className="min-w-0 truncate font-semibold">Dashboard Master</span>
+                        <span className="rounded bg-purple-500/30 border border-purple-400/40 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-tight text-purple-100">
                           Pilih
                         </span>
                       </div>
                     )}
                     {!expanded && (
-                      <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                        Dashboard Master Admin (Pilih Role)
+                      <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                        {isMasterDashboardActive
+                          ? 'Dashboard Master'
+                          : 'Dashboard Master Admin (Pilih Role)'}
                       </span>
                     )}
                   </button>
 
                   {/* POP-UP SIDEBAR ICON: Pilih Role Dashboard & Kembali ke Dashboard Master Admin */}
                   {showMasterPopup && (
-                    <div className="fixed left-3 right-3 top-[120px] z-[90] overflow-hidden rounded-2xl border border-purple-200 bg-white shadow-2xl md:absolute md:left-[calc(100%+10px)] md:right-auto md:top-0 md:w-[320px]">
+                    <div className="fixed left-3 right-3 top-[120px] z-[90] overflow-hidden rounded-2xl border border-purple-200 bg-white text-slate-900 shadow-2xl md:absolute md:left-[calc(100%+10px)] md:right-auto md:top-0 md:w-[320px]">
                       {/* Header Pop-up */}
                       <div className="flex items-center justify-between bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 px-3.5 py-2.5 text-white">
                         <div className="flex items-center gap-2">
@@ -651,12 +873,15 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
 
                       <div className="p-2.5">
                         {/* Opsi Kembali ke Dashboard Master Admin */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleMasterSelectDashboard('master_admin', '/admin/dashboard')
-                          }
-                          className={`mb-2 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${
+                        <Link
+                          href="/admin/dashboard"
+                          draggable={false}
+                          onDragStart={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleMasterSelectDashboard('master_admin', '/admin/dashboard');
+                          }}
+                          className={`select-none mb-2 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${
                             activeRole === 'master_admin'
                               ? dashboardThemeByKey.master_admin.rowActiveBg
                               : 'border-2 border-purple-400 bg-purple-50 text-purple-950 hover:bg-purple-100'
@@ -691,7 +916,7 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
                           ) : (
                             <ChevronRight className="ml-2 h-4 w-4 shrink-0 text-purple-700" />
                           )}
-                        </button>
+                        </Link>
 
                         <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
                           Pindah ke Role Dashboard
@@ -702,13 +927,16 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
                           {masterSwitchableDashboards.map((dash) => {
                             const isCurrent = activeRole === dash.roleKey;
                             return (
-                              <button
+                              <Link
                                 key={dash.roleKey}
-                                type="button"
-                                onClick={() =>
-                                  handleMasterSelectDashboard(dash.roleKey, dash.href)
-                                }
-                                className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition ${
+                                href={dash.href}
+                                draggable={false}
+                                onDragStart={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleMasterSelectDashboard(dash.roleKey, dash.href);
+                                }}
+                                className={`select-none flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition ${
                                   isCurrent ? dash.rowActiveBg : dash.rowBg
                                 }`}
                               >
@@ -733,7 +961,7 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
                                 ) : (
                                   <ChevronRight className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                                 )}
-                              </button>
+                              </Link>
                             );
                           })}
                         </div>
@@ -743,29 +971,50 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
                 </div>
               )}
 
-              {/* Jika bukan Master Admin tapi punya role khusus (Seller/Author/dll) dan sedang di Dashboard Member */}
-              {!hasMasterAuthority &&
-                activeRole === 'member' &&
-                highestOwnedRole !== 'member' &&
-                dashboardThemeByKey[highestOwnedRole] && (
-                  <Link
-                    href={dashboardThemeByKey[highestOwnedRole].href}
-                    className={`group relative flex h-10 items-center rounded-lg text-xs font-semibold transition ${
-                      expanded ? 'gap-2.5 px-2' : 'justify-center px-1'
-                    } ${dashboardThemeByKey[highestOwnedRole].rowBg}`}
-                  >
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${dashboardThemeByKey[highestOwnedRole].iconBg}`}
+              {/* Jika punya role mitra (Seller/Distributor/Penyedia Jasa) dan sedang di Mode Member */}
+              {activeRole === 'member' &&
+                (() => {
+                  const returnPartnerRole =
+                    savedPartnerRole ??
+                    (highestOwnedRole !== 'member' && highestOwnedRole !== 'master_admin'
+                      ? highestOwnedRole
+                      : null);
+                  if (!returnPartnerRole || !dashboardThemeByKey[returnPartnerRole]) {
+                    return null;
+                  }
+                  const partnerTheme = dashboardThemeByKey[returnPartnerRole];
+                  return (
+                    <Link
+                      href={partnerTheme.href}
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.localStorage.setItem('racik-dev-role', returnPartnerRole);
+                          window.localStorage.setItem(
+                            'racik-partner-origin-role',
+                            returnPartnerRole,
+                          );
+                          window.dispatchEvent(new Event('racik-dev-role-change'));
+                        }
+                      }}
+                      title={`Kembali ke ${partnerTheme.label}`}
+                      className={`select-none group relative flex h-9 items-center rounded-lg border border-transparent text-xs font-semibold text-white/90 transition hover:bg-white/15 hover:text-white ${
+                        expanded ? 'gap-2.5 px-2.5' : 'justify-center px-1.5'
+                      }`}
                     >
-                      <LayoutDashboard className="h-4 w-4" />
-                    </span>
-                    {expanded && (
-                      <span className="truncate">
-                        {dashboardThemeByKey[highestOwnedRole].label}
-                      </span>
-                    )}
-                  </Link>
-                )}
+                      <ArrowLeft className="h-5 w-5 shrink-0 text-amber-300" />
+                      {expanded && (
+                        <span className="truncate">Kembali ke {partnerTheme.label}</span>
+                      )}
+                      {!expanded && (
+                        <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                          Kembali ke {partnerTheme.label}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })()}
               </div>
             )}
 
@@ -773,8 +1022,17 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
             <div className="space-y-1 pt-0.5">
               {items.map((item) => {
                 const Icon = item.icon;
-                const active = pathname === item.href;
-                const isBookmarks = item.href === '/bookmarks';
+                const baseHref = item.href.split('?')[0];
+                const active =
+                  pathname === item.href ||
+                  (pathname === baseHref && !item.href.includes('?tab=')) ||
+                  (baseHref === '/seller/products' && pathname.startsWith('/seller/products')) ||
+                  (baseHref === '/service-provider/services' &&
+                    pathname.startsWith('/service-provider/services')) ||
+                  (baseHref === '/kebijakan' && pathname === '/kebijakan') ||
+                  (baseHref === '/chat' && pathname.startsWith('/chat'));
+                const isBookmarks = baseHref === '/bookmarks';
+                const isChat = baseHref === '/chat';
                 const bookmarkCountLabel =
                   bookmarkCount !== undefined
                     ? bookmarkCount > 99
@@ -782,70 +1040,126 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
                       : bookmarkCount
                     : null;
 
+                const partnerChatRole =
+                  activeRole === 'seller'
+                    ? 'seller'
+                    : activeRole === 'distributor'
+                      ? 'distributor'
+                      : activeRole === 'service-provider'
+                        ? 'service_provider'
+                        : null;
+                const chatUnreadCount = isChat
+                  ? chatThreads.reduce((sum, thread) => {
+                      const partnerUnread =
+                        partnerChatRole && thread.partnerRole === partnerChatRole
+                          ? thread.unreadByPartner
+                          : 0;
+                      return sum + thread.unreadByMember + partnerUnread;
+                    }, 0)
+                  : 0;
+                const chatUnreadLabel =
+                  isChat && chatUnreadCount > 0
+                    ? chatUnreadCount > 99
+                      ? '99+'
+                      : chatUnreadCount
+                    : null;
+
                 const dashTheme = item.dashboardKey
                   ? dashboardThemeByKey[item.dashboardKey]
                   : null;
-
-                if (dashTheme) {
-                  return (
-                    <Link
-                      key={`${item.href}-${item.label}`}
-                      href={item.href}
-                      aria-label={item.label}
-                      className={`group relative flex h-10 items-center rounded-lg text-xs font-semibold transition ${
-                        expanded ? 'gap-2.5 px-2' : 'justify-center px-1'
-                      } ${active ? dashTheme.rowActiveBg : dashTheme.rowBg}`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${dashTheme.iconBg}`}
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                      </span>
-                      {expanded && <span className="truncate">{item.label}</span>}
-                      {!expanded && (
-                        <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-                          {item.label}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                }
+                const isDashboardEntry = Boolean(item.dashboardKey && !item.useCustomIcon);
+                const DisplayIcon = isDashboardEntry ? LayoutDashboard : Icon;
+                const activeFrameClass = dashTheme
+                  ? dashTheme.sidebarFrame
+                  : 'border-2 border-emerald-300 bg-slate-950/55 text-white shadow-lg ring-1 ring-emerald-300/40 backdrop-blur-sm';
+                const activeIconBoxClass = dashTheme
+                  ? dashTheme.iconBg
+                  : 'bg-emerald-600 text-white shadow-sm';
 
                 return (
                   <Link
                     key={`${item.href}-${item.label}`}
                     href={item.href}
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (
+                        typeof window !== 'undefined' &&
+                        item.dashboardKey === 'member' &&
+                        activeRole !== 'member'
+                      ) {
+                        if (isPartnerDashboardRole(activeRole)) {
+                          window.localStorage.setItem('racik-partner-origin-role', activeRole);
+                        }
+                        window.localStorage.setItem('racik-dev-role', 'member');
+                        window.dispatchEvent(new Event('racik-dev-role-change'));
+                      }
+                    }}
+                    aria-current={active ? 'page' : undefined}
                     aria-label={
                       isBookmarks && bookmarkCount !== undefined
                         ? `${item.label}: ${bookmarkCount} tersimpan`
+                        : isChat && chatUnreadCount > 0
+                          ? `${item.label}: ${chatUnreadCount} pesan belum dibaca`
+                          : item.label
+                    }
+                    title={
+                      item.dashboardKey === 'member' && activeRole !== 'member'
+                        ? 'Buka Dashboard Member untuk proses pembelian'
                         : item.label
                     }
-                    className={`group relative flex h-9 items-center rounded-md text-sm transition ${
-                      expanded ? 'gap-2.5 px-2.5' : 'justify-center px-1.5'
+                    className={`select-none group relative flex items-center rounded-xl transition ${
+                      expanded ? 'gap-2.5 px-2.5 py-2' : 'justify-center px-1.5 py-2'
                     } ${
                       active
-                        ? 'bg-primary-50 font-semibold text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        ? `${activeFrameClass} font-bold`
+                        : item.dashboardKey === 'member' && activeRole !== 'member'
+                          ? 'border border-transparent text-sm font-medium text-emerald-200 hover:bg-white/15 hover:text-white'
+                          : 'border border-transparent text-sm font-medium text-white/90 hover:bg-white/15 hover:text-white'
                     }`}
                   >
-                    <Icon
-                      className={`h-5 w-5 shrink-0 ${
-                        active ? 'text-primary-700' : 'text-gray-500'
-                      }`}
-                    />
-                    {expanded && <span className="truncate">{item.label}</span>}
+                    {active ? (
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/30 ${activeIconBoxClass}`}
+                      >
+                        <DisplayIcon className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <DisplayIcon
+                        className={`h-5 w-5 shrink-0 ${
+                          item.dashboardKey === 'member' && activeRole !== 'member'
+                            ? 'text-emerald-300'
+                            : 'text-white/80 group-hover:text-white'
+                        }`}
+                      />
+                    )}
+                    {expanded && (
+                      <span className="min-w-0 flex-1 truncate text-xs sm:text-[13px] leading-tight">
+                        {item.label}
+                      </span>
+                    )}
                     {isBookmarks && bookmarkCountLabel !== null && (
                       <span
                         aria-hidden="true"
-                        className={`rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-700 ${
+                        className={`rounded-full bg-emerald-500/25 border border-emerald-400/40 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-200 ${
                           expanded ? 'ml-auto' : 'absolute right-0 top-0'
                         }`}
                       >
                         {bookmarkCountLabel}
                       </span>
                     )}
+                    {isChat && chatUnreadLabel !== null && (
+                      <span
+                        aria-hidden="true"
+                        className={`rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ${
+                          expanded ? 'ml-auto' : 'absolute right-0 top-0'
+                        }`}
+                      >
+                        {chatUnreadLabel}
+                      </span>
+                    )}
                     {!expanded && (
-                      <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
                         {item.label}
                       </span>
                     )}
@@ -859,15 +1173,17 @@ export function Sidebar({ role = 'user' }: SidebarProps) {
         <button
           onClick={handleLogout}
           type="button"
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
           aria-label="Keluar"
-          className={`group relative mt-auto flex h-9 items-center rounded-md text-sm text-rose-600 transition hover:bg-rose-50 ${
+          className={`select-none group relative mt-auto flex h-9 items-center rounded-lg text-sm font-semibold text-rose-200 transition hover:bg-rose-500/25 hover:text-white ${
             expanded ? 'gap-2.5 px-2.5' : 'justify-center px-1.5'
           }`}
         >
           <LogOut className="h-5 w-5 shrink-0" />
           {expanded && <span>Keluar</span>}
           {!expanded && (
-            <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+            <span className="pointer-events-none absolute left-[calc(100%+6px)] top-1/2 z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
               Keluar
             </span>
           )}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useDashboardHomeUrl } from '@/lib/active-role';
 import {
   BadgeCheck,
   Boxes,
@@ -27,6 +28,8 @@ import {
  *  - Ruang Anggota & Tata Kelola (Member / Security & Governance)
  */
 export function HomepageFooter() {
+  const { href: logoHref, roleLabel, isAuthenticated } = useDashboardHomeUrl();
+
   return (
     <footer className="border-t border-gray-200 bg-white text-gray-700" role="contentinfo">
       {/* Banner Kepercayaan & Ekosistem Nusantara */}
@@ -87,8 +90,16 @@ export function HomepageFooter() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-6">
           {/* Kolom 1 & 2: Identitas Brand & Pengenalan */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="inline-block text-2xl font-bold text-primary-700">
-              Racik<span className="text-gray-900"> Media</span>
+            <Link
+              href={logoHref}
+              className="inline-flex items-center"
+              title={isAuthenticated ? `Kembali ke Dashboard (${roleLabel})` : 'Beranda Racik Media'}
+            >
+              <img
+                src="/images/racik-logo.png"
+                alt="Racik Media"
+                className="h-10 w-auto rounded-md bg-white/95 px-1.5 py-0.5 object-contain"
+              />
             </Link>
             <p className="text-sm leading-relaxed text-gray-600">
               Platform media editorial dan marketplace produk serta layanan kreatif nusantara.
@@ -238,8 +249,13 @@ export function HomepageFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/admin/dashboard" className="hover:text-primary-700 hover:underline text-xs text-gray-400">
-                  Panel Moderasi & Admin
+                <Link href="/admin/administration" className="hover:text-primary-700 hover:underline text-xs text-gray-500">
+                  Dashboard Admin (Administrasi)
+                </Link>
+              </li>
+              <li>
+                <Link href="/kebijakan?view=full" className="font-bold text-indigo-700 hover:underline">
+                  Seluruh Kebijakan Penuh Web
                 </Link>
               </li>
             </ul>
@@ -247,15 +263,21 @@ export function HomepageFooter() {
         </div>
       </div>
 
-      {/* Baris Bawah: Hak Cipta, Tagline & Legal */}
+      {/* Baris Bawah: Hak Cipta, Tagline & Akses Seluruh Kebijakan Penuh */}
       <div className="border-t border-gray-100 bg-gray-50 py-5">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-xs text-gray-500 sm:flex-row sm:px-6">
           <p>© {new Date().getFullYear()} Racik Media Nusantara. Seluruh hak cipta dilindungi.</p>
-          <p className="inline-flex items-center gap-1.5 text-gray-600">
-            Dibuat dengan
-            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" aria-hidden="true" />
-            untuk memajukan produk dan kreasi lokal nusantara.
-          </p>
+          <div className="flex flex-wrap items-center gap-4 font-semibold text-gray-600">
+            <Link href="/kebijakan?view=full" className="text-indigo-700 hover:underline">
+              Kebijakan Penuh Seluruh Web
+            </Link>
+            <Link href="/kebijakan?view=full#matriks-role" className="hover:text-primary-700 hover:underline">
+              Ruang Lingkup &amp; Batasan Role
+            </Link>
+            <Link href="/kebijakan?view=full#privasi" className="hover:text-primary-700 hover:underline">
+              Kebijakan Privasi &amp; Escrow
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

@@ -1,23 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
 import { formatRupiah, formatRelativeTime } from '@/lib/utils';
 import {
   ArrowLeft,
-  Package,
   ShieldCheck,
   CheckCircle2,
-  Clock,
   AlertCircle,
   Truck,
-  RotateCw
 } from 'lucide-react';
 import { demoOrders } from '@/lib/demo-data';
+import {
+  markLocalOrderCompleted,
+  useLocalOrders,
+  type LocalOrderItem,
+} from '@/lib/orders-store';
 
 interface OrderDetail {
   id: string;
@@ -27,7 +29,11 @@ interface OrderDetail {
   currency: string;
   notes?: string;
   created_at: string;
-  order_items?: Array<{
+  tracking_number?: string;
+  pickup_contact?: string;
+  courier_name?: string;
+  shipment_note?: string;
+  order_items?: Array<Partial<LocalOrderItem> & {
     id: string;
     entity_type: string;
     entity_id: string;
@@ -36,16 +42,17 @@ interface OrderDetail {
     subtotal: number;
   }>;
   isDemo?: boolean;
+  isLocalOrder?: boolean;
 }
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  const orderId = params?.id as string;
+  const orderId = decodeURIComponent((params?.id as string) || '');
+  const { orders: localOrders } = useLocalOrders();
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['order-detail', orderId],
     enabled: !!session && !!orderId,
     queryFn: () =>
@@ -54,12 +61,22 @@ export default function OrderDetailPage() {
       }),
   });
 
+  const localMatch = useMemo(
+    () =>
+      localOrders.find(
+        (item) =>
+          item.id === orderId ||
+          item.id.toLowerCase() === orderId.toLowerCase(),
+      ),
+    [localOrders, orderId],
+  );
   const sampleOrder = demoOrders.find((item) => item.id === orderId);
-  const isDemo =
-    process.env.NODE_ENV === 'development' &&
-    (!session || isError) &&
-    !!sampleOrder;
-  const order = data?.data ?? (isDemo ? { ...sampleOrder, isDemo: true } : undefined);
+  const order: OrderDetail | undefined =
+    data?.data ??
+    (localMatch ? { ...localMatch, isLocalOrder: true } : undefined) ??
+    (process.env.NODE_ENV === 'development' && (!session || isError) && sampleOrder
+      ? { ...sampleOrder, isDemo: true }
+      : undefined);
 
   // Mutasi konfirmasi penerimaan pesanan
   const confirmMutation = useMutation({
@@ -75,7 +92,7 @@ export default function OrderDetailPage() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading && !order) {
     return (
       <div className="max-w-3xl mx-auto py-8 px-4 space-y-4 animate-pulse">
         <div className="h-4 bg-gray-200 rounded w-1/4" />
@@ -85,7 +102,7 @@ export default function OrderDetailPage() {
     );
   }
 
-  if (isError || !order) {
+  if (!order) {
     return (
       <div className="max-w-md mx-auto py-16 text-center space-y-4">
         <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
@@ -100,6 +117,17 @@ export default function OrderDetailPage() {
     );
   }
 
+  const canBuyerConfirm =
+    order.status === 'escrow_held' || order.status === 'in_fulfillment';
+
+  function handleConfirmReceived() {
+    if (order?.isLocalOrder) {
+      markLocalOrderCompleted(order.id);
+      return;
+    }
+    confirmMutation.mutate();
+  }
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
       <Link
@@ -109,19 +137,19 @@ export default function OrderDetailPage() {
         <ArrowLeft className="w-4 h-4" /> Kembali ke Riwayat Pesanan
       </Link>
 
-      {isDemo && (
+      {(order.isDemo || order.isLocalOrder) && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Pesanan pratinjau lokal karena API belum tersedia. Tidak ada pembayaran atau perubahan status sungguhan.
+          Pesanan mode simulasi lokal aktif. Konfirmasi penerimaan akan langsung melepaskan dana Escrow ke Saldo Mitra.
         </p>
       )}
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            Detail Pesanan #{order.id.slice(0, 8)}
+            Detail Pesanan #{order.id}
           </h1>
           <p className="text-xs text-gray-400 mt-0.5">
-            Dibuat pada {formatRelativeTime(order.created_at)}
+            Dibuat {formatRelativeTime(order.created_at)}
           </p>
         </div>
 
@@ -129,11 +157,11 @@ export default function OrderDetailPage() {
           className={`text-xs px-3 py-1 rounded-full font-semibold capitalize ${
             order.status === 'completed'
               ? 'bg-green-100 text-green-700'
-              : order.status === 'escrow_held'
-              ? 'bg-blue-100 text-blue-700'
-              : order.status === 'pending_payment'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-gray-100 text-gray-700'
+              : order.status === 'in_fulfillment'
+                ? 'bg-blue-100 text-blue-700'
+                : order.status === 'escrow_held'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-gray-100 text-gray-700'
           }`}
         >
           {order.status.replace(/_/g, ' ')}
@@ -146,10 +174,32 @@ export default function OrderDetailPage() {
         <div>
           <h3 className="text-sm font-bold text-emerald-900">Garansi Transaksi Aman (Escrow)</h3>
           <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
-            Dana Anda ditahan dengan aman oleh sistem Escrow Racik Media dan baru akan diteruskan ke penjual setelah Anda mengonfirmasi bahwa bibit/pupuk telah diterima dengan baik.
+            Dana Anda ditahan dengan aman oleh sistem Rekber Racik Media dan baru akan diteruskan ke mitra penjual/distributor/jasa setelah Anda mengonfirmasi bahwa barang/layanan diterima dengan aman.
           </p>
         </div>
       </div>
+
+      {(order.tracking_number || order.pickup_contact) && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 space-y-1 text-xs">
+          <p className="font-bold text-blue-950 flex items-center gap-1.5">
+            <Truck className="w-4 h-4 text-blue-600" />
+            Info Pengiriman ({order.courier_name || 'Kurir Mitra'})
+          </p>
+          {order.tracking_number && (
+            <p className="text-blue-900">
+              Nomor Resi / Bukti: <code className="font-mono font-bold">{order.tracking_number}</code>
+            </p>
+          )}
+          {order.pickup_contact && (
+            <p className="text-blue-900">
+              Kontak Armada Pickup: <span className="font-mono font-bold">{order.pickup_contact}</span>
+            </p>
+          )}
+          {order.shipment_note && (
+            <p className="text-slate-600">Catatan: {order.shipment_note}</p>
+          )}
+        </div>
+      )}
 
       {/* Rincian Produk */}
       <div className="card space-y-4">
@@ -159,7 +209,7 @@ export default function OrderDetailPage() {
             <div key={item.id} className="py-3 flex items-center justify-between text-xs">
               <div>
                 <span className="font-semibold text-gray-800">
-                  Item #{item.entity_id.slice(0, 8)}
+                  {item.name || `Item #${item.entity_id.slice(0, 8)}`}
                 </span>
                 <p className="text-gray-400 mt-0.5">
                   {item.quantity} x {formatRupiah(item.unit_price)}
@@ -181,20 +231,25 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Aksi Pembeli */}
-      {order.status === 'escrow_held' && !order.isDemo && (
+      {canBuyerConfirm && !order.isDemo && (
         <div className="card p-6 bg-slate-50 border-emerald-200 text-center space-y-3">
           <Truck className="w-10 h-10 text-emerald-600 mx-auto" />
-          <h3 className="text-sm font-bold text-gray-900">Pesanan Sedang Diproses / Dikirim</h3>
+          <h3 className="text-sm font-bold text-gray-900">
+            {order.status === 'in_fulfillment'
+              ? 'Pesanan Sedang Dikirim / Dikerjakan'
+              : 'Pesanan Sudah Masuk Rekber Platform'}
+          </h3>
           <p className="text-xs text-gray-500 max-w-md mx-auto">
-            Jika barang sudah sampai dan kondisi bibit/pupuk sesuai, silakan konfirmasi penerimaan di bawah untuk melepaskan dana ke penjual.
+            Jika barang atau layanan sudah diterima dengan aman dan sesuai pesanan, silakan klik tombol di bawah untuk melepaskan dana Rekber ke mitra.
           </p>
           <button
-            onClick={() => confirmMutation.mutate()}
+            type="button"
+            onClick={handleConfirmReceived}
             disabled={confirmMutation.isPending}
             className="btn-primary inline-flex items-center gap-2 text-xs"
           >
             <CheckCircle2 className="w-4 h-4" />
-            {confirmMutation.isPending ? 'Memproses...' : 'Konfirmasi Barang Diterima'}
+            {confirmMutation.isPending ? 'Memproses...' : 'Barang Diterima dengan Aman'}
           </button>
         </div>
       )}
@@ -204,7 +259,7 @@ export default function OrderDetailPage() {
           <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
           <h3 className="text-sm font-bold text-emerald-900">Pesanan Selesai</h3>
           <p className="text-xs text-emerald-700">
-            Terima kasih! Dana escrow telah sukses dicairkan ke penjual.
+            Terima kasih! Dana escrow telah dilepas ke Saldo Siap Dicairkan mitra (dipotong biaya platform 5%).
           </p>
         </div>
       )}

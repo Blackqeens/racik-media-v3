@@ -6,13 +6,13 @@ import type { SetAllCookies } from '@supabase/ssr';
 /**
  * middleware.ts — Route protection & Anti-Crack Guard via Supabase SSR.
  *
- * Aturan akses (sesuai permission-matrix.md):
+ * Aturan akses (sesuai permission-matrix.md & kebijakan naungan Moderator):
  *   /dashboard/*        → wajib login (semua role)
- *   /author/*           → wajib login + role author / master_admin
+ *   /author/*           → dialihkan ke /admin/moderation (author di bawah naungan moderator)
  *   /seller/*           → wajib login + role seller / master_admin (kecuali /seller/register)
  *   /distributor/*      → wajib login + role distributor / master_admin
  *   /service-provider/* → wajib login + role service_provider / expert / master_admin
- *   /admin/moderation/* → wajib login + role moderator / admin / master_admin
+ *   /admin/moderation/* → wajib login + role moderator / master_admin
  *   /admin/* lainnya    → wajib login + role admin / master_admin
  *   /login, /register   → redirect ke /dashboard jika sudah login
  */
@@ -33,8 +33,13 @@ const AUTHOR_ROUTES = ['/author'];
 const SELLER_ROUTES = ['/seller/dashboard', '/seller/products', '/seller/orders', '/seller/reports'];
 const ADMIN_ROUTES = [
   '/admin/dashboard',
+  '/admin/administration',
   '/admin/seller-verification',
   '/admin/financial-report',
+  '/admin/algorithm-settings',
+  '/admin/helpdesk',
+  '/admin/ai-skills',
+  '/admin/chat-master',
 ];
 const MODERATION_ROUTES = ['/admin/moderation'];
 const DISTRIBUTOR_ROUTES = ['/distributor'];
@@ -125,9 +130,14 @@ export async function middleware(request: NextRequest) {
     isProtectedAuthorRoute;
 
   if (needsAuth && !isLoggedIn) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl);
+    // Rujukan login hanya saat pengunjung melakukan proses pembelian / transaksi
+    if (pathname.startsWith('/checkout') || pathname.startsWith('/cart') || pathname.startsWith('/orders')) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('next', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    // Akses ke dashboard role tanpa sesi login langsung dikembalikan ke Homepage publik
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   // Ambil role terverifikasi dari user_roles + individual_profiles jika mengakses rute khusus role
@@ -167,26 +177,43 @@ export async function middleware(request: NextRequest) {
     const hasAnyRole = (allowed: string[]) => allowed.some((r) => verifiedRoles.has(r));
 
     if (isProtectedSellerRoute && !hasAnyRole(['seller', 'master_admin'])) {
-      return NextResponse.redirect(new URL('/seller/register', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
 
     if (isProtectedDistributorRoute && !hasAnyRole(['distributor', 'master_admin'])) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
 
     if (isProtectedServiceProviderRoute && !hasAnyRole(['service_provider', 'master_admin'])) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
 
-    if (isProtectedAuthorRoute && !hasAnyRole(['author', 'master_admin'])) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+    if (isProtectedAuthorRoute) {
+      if (hasAnyRole(['moderator', 'master_admin'])) {
+        return NextResponse.redirect(new URL('/admin/moderation', request.url));
+      }
+      return NextResponse.redirect(new URL('/articles/write', request.url));
+    }
+
+    if (pathname.startsWith('/admin/chat-master')) {
+      if (!hasAnyRole(['admin', 'moderator', 'master_admin'])) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+      return response;
+    }
+
+    if (pathname.startsWith('/admin/ai-skills')) {
+      if (!hasAnyRole(['master_admin'])) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+      return response;
     }
 
     if (isProtectedAdminRoute && !hasAnyRole(['admin', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 
-    if (isProtectedModerationRoute && !hasAnyRole(['moderator', 'admin', 'master_admin'])) {
+    if (isProtectedModerationRoute && !hasAnyRole(['moderator', 'master_admin'])) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }

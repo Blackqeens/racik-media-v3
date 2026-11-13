@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
 import { formatRupiah, formatRelativeTime } from '@/lib/utils';
-import { Package, Clock, CheckCircle2, ChevronRight, ShoppingBag } from 'lucide-react';
+import { Package, Clock, CheckCircle2, ChevronRight, ShoppingBag, Sparkles } from 'lucide-react';
 import { demoOrders } from '@/lib/demo-data';
 
 interface OrderItem {
@@ -16,7 +16,6 @@ interface OrderItem {
   gross_amount: number;
   created_at: string;
 }
-
 export default function OrdersPage() {
   const { session } = useAuth();
 
@@ -33,17 +32,39 @@ export default function OrdersPage() {
   const orders = isDemo ? demoOrders : data?.data?.items ?? [];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto py-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Riwayat Pesanan</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Pantau status pesanan, pembayaran, dan proteksi escrow Anda.
-          </p>
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Hero Header Riwayat Pesanan — Tema & Animasi Seragam dengan Dashboard Lainnya */}
+      <div className="dashboard-hero-slow relative isolate overflow-hidden rounded-2xl border border-emerald-300/60 p-6 sm:p-7 text-white shadow-xl">
+        <div
+          aria-hidden="true"
+          className="dashboard-hero-orb-a pointer-events-none absolute -left-16 -top-20 -z-10 h-72 w-72 rounded-full bg-emerald-400/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="dashboard-hero-orb-b pointer-events-none absolute -bottom-24 right-8 -z-10 h-80 w-80 rounded-full bg-teal-400/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="dashboard-hero-grid-drift pointer-events-none absolute inset-0 -z-10 opacity-20"
+        />
+
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-2 max-w-2xl">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-white leading-tight drop-shadow-sm">
+              Riwayat Pesanan
+            </h1>
+            <p className="text-xs sm:text-sm text-white/95 leading-relaxed">
+              Pantau status pesanan, pembayaran, dan proteksi Rekening Bersama (Escrow) Anda.
+            </p>
+          </div>
+          <Link
+            href="/marketplace"
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-white bg-white hover:bg-emerald-50 px-4 py-2.5 text-xs font-extrabold text-slate-900 shadow-lg shrink-0 transition"
+          >
+            <ShoppingBag className="h-3.5 w-3.5 text-emerald-700" />
+            Belanja Lagi
+          </Link>
         </div>
-        <Link href="/marketplace" className="btn-secondary text-xs">
-          Belanja Lagi
-        </Link>
       </div>
 
       {isDemo && (
@@ -87,15 +108,14 @@ export default function OrdersPage() {
                       {formatRupiah(order.gross_amount)}
                     </span>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${
-                        order.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : order.status === 'escrow_held'
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${order.status === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : order.status === 'escrow_held'
                           ? 'bg-blue-100 text-blue-700'
                           : order.status === 'pending_payment'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
                     >
                       {order.status.replace(/_/g, ' ')}
                     </span>

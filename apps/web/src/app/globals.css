@@ -99,6 +99,88 @@
   animation: ceritaHeroRunningGlow 7s ease-in-out infinite;
 }
 
+/* ── HERO DASHBOARD — Animasi Background CSS Murni (Tanpa Gambar), Berjalan Slow & Langsung Aktif ── */
+@keyframes dashboardHeroGradientSlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes dashboardOrbSlowA {
+  0% {
+    transform: translate3d(-10%, -10%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(35%, 15%, 0) scale(1.25);
+  }
+  100% {
+    transform: translate3d(-10%, -10%, 0) scale(1);
+  }
+}
+
+@keyframes dashboardOrbSlowB {
+  0% {
+    transform: translate3d(15%, 10%, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(-30%, -15%, 0) scale(0.9);
+  }
+  100% {
+    transform: translate3d(15%, 10%, 0) scale(1.1);
+  }
+}
+
+@keyframes dashboardGridDriftSlow {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 120px 60px;
+  }
+}
+
+.dashboard-hero-slow {
+  background-image: linear-gradient(
+    125deg,
+    #1e1b4b 0%,
+    #312e81 18%,
+    #1d4ed8 38%,
+    #0f766e 62%,
+    #047857 82%,
+    #312e81 100%
+  );
+  background-size: 320% 320%;
+  animation: dashboardHeroGradientSlow 12s ease-in-out infinite;
+  animation-play-state: running;
+  will-change: background-position;
+}
+
+.dashboard-hero-orb-a {
+  animation: dashboardOrbSlowA 14s ease-in-out infinite;
+  animation-play-state: running;
+  will-change: transform;
+}
+
+.dashboard-hero-orb-b {
+  animation: dashboardOrbSlowB 18s ease-in-out infinite;
+  animation-play-state: running;
+  will-change: transform;
+}
+
+.dashboard-hero-grid-drift {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1px, transparent 1px);
+  background-size: 24px 24px;
+  animation: dashboardGridDriftSlow 20s linear infinite;
+  animation-play-state: running;
+  will-change: background-position;
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .cerita-hero-animated,
@@ -109,73 +191,93 @@
   }
 }
 
-html[data-theme="dark"] {
-  --color-surface: #121218;
-  --color-border: #374151;
-  --color-text: #e5e7eb;
+/* Soft, modern editorial themes selected via html[data-theme="..."] */
+html[data-theme="forest"] {
+  --color-surface: #eef5f0;
+  --color-border: #cfe0d5;
+  --color-text: #1c3127;
 }
 
-html[data-theme="dark"] body {
+html[data-theme="forest"] body {
   background: var(--color-surface);
   color: var(--color-text);
 }
 
-html[data-theme="dark"] header,
-html[data-theme="dark"] header nav,
-html[data-theme="dark"] header nav+div {
-  background-color: #1e1e2e !important;
-  border-color: #374151;
+html[data-theme="forest"] header,
+html[data-theme="forest"] aside:not(.dashboard-hero-slow) {
+  background-color: rgba(247, 251, 248, 0.94) !important;
+  border-color: #d3e3d8 !important;
+  backdrop-filter: blur(8px);
 }
 
-html[data-theme="dark"] .card {
-  background: #1e1e2e;
-  border-color: #374151;
+html[data-theme="forest"] .card,
+html[data-theme="forest"] footer {
+  background-color: #fafdfb !important;
+  border-color: #d6e5db !important;
+  box-shadow: 0 1px 3px rgba(24, 58, 40, 0.04);
 }
 
-/*
- * EDIT MANUAL - WARNA TEMA
- * Tema dipilih melalui html[data-theme="nama-tema"].
- *
- * body:
- *   Warna latar seluruh halaman.
- *
- * header:
- *   Warna navbar atas.
- *
- * .card:
- *   Warna kartu dashboard, form, dan panel.
- *
- * --color-surface dan --color-border:
- *   Digunakan oleh komponen lain yang memakai CSS variable.
- *
- * Contoh menambah tema baru:
- * html[data-theme="forest"] body { background: #ecfdf5; }
- * html[data-theme="forest"] header { background: #dcfce7; }
- * html[data-theme="forest"] .card {
- *   background: #f0fdf4;
- *   border-color: #86efac;
- * }
- */
+html[data-theme="forest"] footer .bg-slate-50,
+html[data-theme="forest"] footer .bg-gray-50 {
+  background-color: #f1f7f3 !important;
+}
+
+html[data-theme="ocean"] {
+  --color-surface: #eaf2fb;
+  --color-border: #cde0f5;
+  --color-text: #162b44;
+}
+
 html[data-theme="ocean"] body {
-  background: #ecfeff;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
-html[data-theme="ocean"] header {
-  background: #f0f9ff;
+html[data-theme="ocean"] header,
+html[data-theme="ocean"] aside:not(.dashboard-hero-slow) {
+  background-color: rgba(248, 251, 255, 0.94) !important;
+  border-color: #d0e1f4 !important;
+  backdrop-filter: blur(8px);
 }
 
-html[data-theme="sunset"] body {
-  background: #fefce8;
+html[data-theme="ocean"] .card,
+html[data-theme="ocean"] footer {
+  background-color: #fafcfe !important;
+  border-color: #d4e3f5 !important;
+  box-shadow: 0 1px 3px rgba(20, 48, 82, 0.04);
 }
 
-html[data-theme="sunset"] header {
-  background: #fffbeb;
+html[data-theme="ocean"] footer .bg-slate-50,
+html[data-theme="ocean"] footer .bg-gray-50 {
+  background-color: #f1f6fd !important;
+}
+
+html[data-theme="lavender"] {
+  --color-surface: #f2effb;
+  --color-border: #ded7f4;
+  --color-text: #251f3d;
 }
 
 html[data-theme="lavender"] body {
-  background: #faf5ff;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
-html[data-theme="lavender"] header {
-  background: #faf5ff;
+html[data-theme="lavender"] header,
+html[data-theme="lavender"] aside:not(.dashboard-hero-slow) {
+  background-color: rgba(250, 249, 255, 0.94) !important;
+  border-color: #dfd8f4 !important;
+  backdrop-filter: blur(8px);
+}
+
+html[data-theme="lavender"] .card,
+html[data-theme="lavender"] footer {
+  background-color: #fcfbff !important;
+  border-color: #e2dcf5 !important;
+  box-shadow: 0 1px 3px rgba(67, 56, 130, 0.04);
+}
+
+html[data-theme="lavender"] footer .bg-slate-50,
+html[data-theme="lavender"] footer .bg-gray-50 {
+  background-color: #f4f1fc !important;
 }

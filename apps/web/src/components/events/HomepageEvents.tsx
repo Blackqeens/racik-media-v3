@@ -17,6 +17,7 @@ import {
   CalendarX,
   X,
 } from 'lucide-react';
+import { useEditorialArchive } from '@/lib/editorial-archive';
 
 export interface HomepageEventItem {
   id: string;
@@ -131,13 +132,39 @@ const EVENT_TABS = [
  * dengan fitur pendaftaran langsung interaktif.
  */
 export function HomepageEvents() {
+  const { items: archiveItems } = useEditorialArchive();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [registeredEvent, setRegisteredEvent] = useState<HomepageEventItem | null>(null);
   const [registeredList, setRegisteredList] = useState<Record<string, boolean>>({});
 
+  const curatedEvents: HomepageEventItem[] = useMemo(() => {
+    const fromArchive = archiveItems
+      .filter((i) => i.entityType === 'event' && i.publishedToHomepage)
+      .map((i) => ({
+        id: i.id,
+        title: i.title,
+        description: i.excerpt,
+        category: (i.category as HomepageEventItem['category']) || 'webinar',
+        eventType: i.eventType ?? 'online',
+        location: i.location ?? 'Zoom Meeting / Online',
+        eventDate: i.eventDate ?? i.publishedAt,
+        startTime: i.startTime ?? '09:00 WIB',
+        endTime: i.endTime ?? '12:00 WIB',
+        price: i.price ?? 0,
+        maxAttendees: i.maxAttendees ?? 100,
+        registeredAttendeesCount: i.registeredAttendeesCount ?? 15,
+        bannerImage: i.image,
+        speaker: {
+          name: i.submitterName,
+          role: i.speakerRole ?? 'Praktisi & Narasumber Racik Media',
+        },
+      }));
+    return fromArchive.length > 0 ? fromArchive : EVENTS_DATA;
+  }, [archiveItems]);
+
   const filteredEvents = useMemo(() => {
-    return EVENTS_DATA.filter((evt) => {
+    return curatedEvents.filter((evt) => {
       let matchTab = true;
       if (activeTab === 'online') matchTab = evt.eventType === 'online';
       else if (activeTab === 'offline') matchTab = evt.eventType === 'offline';
@@ -151,7 +178,7 @@ export function HomepageEvents() {
 
       return matchTab && matchSearch;
     });
-  }, [searchTerm, activeTab]);
+  }, [curatedEvents, searchTerm, activeTab]);
 
   const formatDate = (dateString: string) => {
     try {

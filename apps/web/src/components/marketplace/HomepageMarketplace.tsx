@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useCartStore } from '@/stores/cart.store';
+import { useEditorialArchive } from '@/lib/editorial-archive';
 
 export interface HomepageProduct {
   id: string;
@@ -212,6 +213,7 @@ const SORT_OPTIONS = [
  * dengan integrasi langsung ke Keranjang Belanja (Zustand `useCartStore`).
  */
 export function HomepageMarketplace() {
+  const { items: archiveItems } = useEditorialArchive();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
@@ -219,8 +221,33 @@ export function HomepageMarketplace() {
 
   const addItem = useCartStore((s) => s.addItem);
 
+  const curatedProducts: HomepageProduct[] = useMemo(() => {
+    const fromArchive = archiveItems
+      .filter((i) => i.entityType === 'product_description' && i.publishedToHomepage)
+      .map((i) => ({
+        id: i.id,
+        title: i.title,
+        description: i.excerpt,
+        price: i.productPrice ?? 35000,
+        category: i.category,
+        categoryLabel: i.categoryLabel,
+        image: i.image,
+        vendor: {
+          id: `ven-${i.id}`,
+          storeName: i.submitterName,
+          origin: i.submitterOrigin ?? 'Nusantara',
+          rating: i.rating ?? 4.9,
+          isVerified: true,
+        },
+        stock: i.stock ?? 50,
+        soldCount: i.soldCount ?? 120,
+        badge: i.badge,
+      }));
+    return fromArchive.length > 0 ? fromArchive : HOMEPAGE_PRODUCTS;
+  }, [archiveItems]);
+
   const filteredProducts = useMemo(() => {
-    let result = HOMEPAGE_PRODUCTS.filter((product) => {
+    let result = curatedProducts.filter((product) => {
       const matchCat = selectedCategory === 'all' || product.category === selectedCategory;
       const matchSearch =
         !searchTerm ||
@@ -239,7 +266,7 @@ export function HomepageMarketplace() {
     }
 
     return result;
-  }, [searchTerm, selectedCategory, sortBy]);
+  }, [curatedProducts, searchTerm, selectedCategory, sortBy]);
 
   function handleAddToCart(e: React.MouseEvent, product: HomepageProduct) {
     e.preventDefault();

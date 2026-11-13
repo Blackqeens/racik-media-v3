@@ -10,6 +10,7 @@ import {
   BriefcaseBusiness,
   ChevronDown,
   ClipboardCheck,
+  FileCheck2,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -66,20 +67,6 @@ const ROLE_DASHBOARDS = [
     ],
   },
   {
-    roleKey: 'author',
-    role: 'Author / Penulis',
-    desc: 'Dashboard penulis — artikel, draft, moderasi',
-    href: '/author/dashboard',
-    icon: PenLine,
-    color: 'bg-amber-600',
-    hoverColor: 'hover:bg-amber-700',
-    pages: [
-      { label: 'Dashboard Penulis', href: '/author/dashboard' },
-      { label: 'Tulis Artikel', href: '/articles/write' },
-      { label: 'Daftar Artikel', href: '/articles' },
-    ],
-  },
-  {
     roleKey: 'distributor',
     role: 'Distributor',
     desc: 'Dashboard distribusi — logistik, pengiriman',
@@ -93,29 +80,47 @@ const ROLE_DASHBOARDS = [
   },
   {
     roleKey: 'moderator',
-    role: 'Moderator',
-    desc: 'Panel kurasi — antrean moderasi produk & artikel',
+    role: 'Moderator (Naungan Penulis)',
+    desc: 'Otoritas penuh arsip tulisan, naungan author, analisis gambar tema & publikasi homepage',
     href: '/admin/moderation',
     icon: ClipboardCheck,
     color: 'bg-teal-600',
     hoverColor: 'hover:bg-teal-700',
     pages: [
-      { label: 'Antrean Moderasi', href: '/admin/moderation' },
+      { label: 'Panel Arsip & Moderasi', href: '/admin/moderation' },
+      { label: 'Koleksi Artikel', href: '/articles' },
+      { label: 'Koleksi Event', href: '/events' },
+      { label: 'Tulis Ide & Cerita', href: '/articles/write' },
+    ],
+  },
+  {
+    roleKey: 'admin',
+    role: 'Admin (Administrasi & Legalitas)',
+    desc: 'Pengelolaan dokumen administrasi seller/distributor, pengajuan member → mitra, komplain & penyelesaian masalah',
+    href: '/admin/administration',
+    icon: FileCheck2,
+    color: 'bg-indigo-600',
+    hoverColor: 'hover:bg-indigo-700',
+    pages: [
+      { label: 'Dashboard Admin (Administrasi)', href: '/admin/administration' },
+      { label: 'Pengajuan Member → Seller/Distributor', href: '/admin/seller-verification' },
+      { label: 'Komplain & Penyelesaian Masalah', href: '/admin/administration?tab=complaints' },
+      { label: 'Dokumen & Legalitas Mitra', href: '/admin/administration?tab=legality' },
     ],
   },
   {
     roleKey: 'master_admin',
     role: 'Master Admin',
-    desc: 'Panel otoritas penuh — semua dashboard, moderasi, keuangan',
+    desc: 'Pusat kendali lintas role — pengawasan strategis, rekening bersama escrow & laporan keuangan',
     href: '/admin/dashboard',
     icon: ShieldCheck,
     color: 'bg-red-600',
     hoverColor: 'hover:bg-red-700',
     pages: [
-      { label: 'Admin Dashboard', href: '/admin/dashboard' },
-      { label: 'Moderasi Konten', href: '/admin/moderation' },
-      { label: 'Verifikasi Seller', href: '/admin/seller-verification' },
-      { label: 'Laporan Keuangan', href: '/admin/financial-report' },
+      { label: 'Master Admin Dashboard', href: '/admin/dashboard' },
+      { label: 'Delegasi Admin Administrasi', href: '/admin/administration' },
+      { label: 'Delegasi Moderasi Konten', href: '/admin/moderation' },
+      { label: 'Laporan Keuangan & Escrow', href: '/admin/financial-report' },
     ],
   },
 ];
@@ -123,6 +128,12 @@ const ROLE_DASHBOARDS = [
 function activateDevRole(roleKey: string) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem('racik-dev-role', roleKey);
+    if (roleKey === 'seller' || roleKey === 'distributor' || roleKey === 'service_provider') {
+      const originRole = roleKey === 'service_provider' ? 'service-provider' : roleKey;
+      window.localStorage.setItem('racik-partner-origin-role', originRole);
+    } else {
+      window.localStorage.removeItem('racik-partner-origin-role');
+    }
     if (roleKey === 'master_admin') {
       window.localStorage.setItem('racik-dev-master', 'true');
     } else {

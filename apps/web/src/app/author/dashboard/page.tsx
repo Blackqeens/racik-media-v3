@@ -10,7 +10,7 @@ export default function AuthorDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard Author</h1>

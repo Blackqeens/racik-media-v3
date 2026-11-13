@@ -301,7 +301,7 @@ export function HomepageServices() {
               className="group flex flex-col justify-between rounded-2xl border border-gray-200 bg-white overflow-hidden hover:border-emerald-300 hover:shadow-md transition-all"
             >
               <div>
-                {/* Cover Image & Badges */}
+                {/* Cover Image — Bersih Tanpa Badge Penutup Gambar */}
                 <div className="relative aspect-[16/10] bg-gray-100 overflow-hidden">
                   <img
                     src={item.coverImage}
@@ -309,14 +309,6 @@ export function HomepageServices() {
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     loading="lazy"
                   />
-                  <span className="absolute top-3 left-3 bg-white/95 backdrop-blur text-gray-800 text-[10px] font-semibold px-2.5 py-1 rounded-md shadow-sm">
-                    {item.categoryLabel}
-                  </span>
-                  {item.hasMilestones && (
-                    <span className="absolute bottom-3 right-3 bg-emerald-700 text-white text-[10px] font-semibold px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
-                      <Layers className="h-3 w-3" /> Kontrak Bertahap
-                    </span>
-                  )}
                 </div>
 
                 {/* Body Content */}

@@ -6,8 +6,10 @@ const path = require('path');
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
-  // Output standalone untuk Docker deployment
-  output: 'standalone',
+  // Output standalone untuk Docker/Linux deployment (di Windows symlink standalone butuh Developer Mode/Admin)
+  ...(process.platform !== 'win32' || process.env.NEXT_OUTPUT === 'standalone'
+    ? { output: 'standalone' }
+    : {}),
 
   webpack: (config) => {
     config.resolve.alias = {

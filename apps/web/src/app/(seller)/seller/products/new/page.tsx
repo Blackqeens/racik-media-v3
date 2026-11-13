@@ -5,17 +5,23 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
-import { ArrowLeft, PackagePlus, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  updateEditorialArchiveItem,
+  analyzeWritingAndImage,
+  type EditorialArchiveItem,
+} from '@/lib/editorial-archive';
+import { ArrowLeft, PackagePlus, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function NewProductPage() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
 
   const [title, setTitle]             = useState('');
   const [category, setCategory]       = useState('bibit');
   const [itemType, setItemType]       = useState('retail');
   const [price, setPrice]             = useState('');
   const [stock, setStock]             = useState('50');
+  const [imageUrl, setImageUrl]       = useState('https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400');
   const [description, setDescription] = useState('');
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState<string | null>(null);
@@ -23,27 +29,56 @@ export default function NewProductPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!session) {
-      router.push('/login?next=/seller/products/new');
-      return;
-    }
 
     setLoading(true);
     setError(null);
 
     try {
-      await apiClient.post(
-        '/catalog',
-        {
-          title,
-          category,
-          item_type: itemType,
-          price_fixed: Number(price),
-          stock_quantity: Number(stock),
-          description,
-        },
-        { Authorization: `Bearer ${session.access_token}` },
-      );
+      const id = `prd-${Date.now()}`;
+      const draftItem: EditorialArchiveItem = {
+        id,
+        slug: id,
+        entityType: 'product_description',
+        sourceRole: itemType === 'wholesale' ? 'distributor' : 'seller',
+        submitterName: user?.email || 'Toko Mitra Seller',
+        submitterOrigin: itemType === 'wholesale' ? 'Grosir Nusantara' : 'Mitra Toko',
+        title: title.trim(),
+        excerpt: description.trim().slice(0, 140),
+        body: description.trim(),
+        category,
+        categoryLabel: category.toUpperCase(),
+        productPrice: Number(price || 0),
+        stock: Number(stock || 0),
+        soldCount: 0,
+        rating: 5.0,
+        badge: itemType === 'wholesale' ? 'Grosir' : 'Produk Baru',
+        publishedAt: new Date().toISOString(),
+        image: imageUrl.trim(),
+        status: 'pending_review',
+        publishedToHomepage: false,
+        writingVerified: false,
+        imageThemeVerified: false,
+      };
+
+      const analysis = analyzeWritingAndImage(draftItem);
+      draftItem.moderatorNotes = `Pengajuan produk baru (Skor ${analysis.score}/100). Menunggu kurasi deskripsi & gambar oleh Moderator sebelum tampil di Homepage.`;
+
+      updateEditorialArchiveItem(draftItem);
+
+      if (session) {
+        await apiClient.post(
+          '/catalog',
+          {
+            title,
+            category,
+            item_type: itemType,
+            price_fixed: Number(price),
+            stock_quantity: Number(stock),
+            description,
+          },
+          { Authorization: `Bearer ${session.access_token}` },
+        ).catch(() => null);
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -57,7 +92,7 @@ export default function NewProductPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
       <Link
         href="/seller/products"
         className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800"
@@ -168,6 +203,19 @@ export default function NewProductPage() {
         </div>
 
         <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">URL Gambar Produk (Wajib Sesuai Tema Produk)</label>
+          <input
+            type="url"
+            className="input-base"
+            placeholder="https://images.unsplash.com/..."
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            required
+            disabled={loading}
+          />
+        </div>
+
+        <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">Deskripsi Lengkap Produk</label>
           <textarea
             rows={4}
@@ -175,8 +223,13 @@ export default function NewProductPage() {
             placeholder="Jelaskan spesifikasi, keunggulan bibit/pupuk, cara aplikasi, dan dosis pemakaian..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            required
             disabled={loading}
           />
+          <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            Deskripsi &amp; gambar produk akan masuk ke antrean <strong>Dashboard Moderator</strong> untuk verifikasi tata tulis sebelum dapat tampil di Homepage.
+          </p>
         </div>
 
         <button
@@ -185,7 +238,7 @@ export default function NewProductPage() {
           disabled={loading || success}
         >
           <PackagePlus className="w-4 h-4" />
-          {loading ? 'Menyimpan Produk...' : 'Publikasikan Produk'}
+          {loading ? 'Menyimpan & Mengajukan ke Moderator...' : 'Simpan Produk & Ajukan Deskripsi ke Moderator'}
         </button>
       </form>
     </div>

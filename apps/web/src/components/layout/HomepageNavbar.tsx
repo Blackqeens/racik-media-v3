@@ -1,38 +1,39 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { useCartStore, selectCartCount } from '@/stores/cart.store';
+import { useDashboardHomeUrl } from '@/lib/active-role';
 
 export function HomepageNavbar() {
   const cartItems = useCartStore((s) => s.items);
   const cartCount = selectCartCount(cartItems);
+  const { href: logoHref, roleLabel, isAuthenticated } = useDashboardHomeUrl();
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur">
-      <nav className="mx-auto flex h-16 w-full items-center justify-between px-3 sm:px-4 lg:px-6">
+      <nav className="mx-auto flex h-16 max-w-7xl w-full items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2">
-          {/* Tombol Toggle Sidebar Homepage */}
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new Event('racik-sidebar-toggle'))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
-            aria-label="Buka atau sembunyikan sidebar"
-            title="Buka atau sembunyikan sidebar"
+          <Link
+            href={logoHref}
+            className="text-lg font-bold text-primary-700"
+            title={isAuthenticated ? `Kembali ke Dashboard (${roleLabel})` : 'Beranda Racik Media'}
           >
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="h-6 w-px shrink-0 bg-gray-200" aria-hidden="true" />
-          <Link href="/" className="ml-1 text-lg font-bold text-primary-700">
             Racik<span className="hidden sm:inline"> Media</span>
           </Link>
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <Link href="/articles" className="hidden px-3 py-2 text-gray-600 hover:text-primary-700 sm:block">
+          <Link
+            href="/articles"
+            className="hidden px-3 py-2 text-gray-600 hover:text-primary-700 sm:block"
+          >
             Artikel
           </Link>
-          <Link href="/marketplace" className="hidden px-3 py-2 text-gray-600 hover:text-primary-700 sm:block">
+          <Link
+            href="/marketplace"
+            className="hidden px-3 py-2 text-gray-600 hover:text-primary-700 sm:block"
+          >
             Marketplace
           </Link>
           <Link
@@ -47,7 +48,10 @@ export function HomepageNavbar() {
               </span>
             )}
           </Link>
-          <Link href="/login" className="rounded-lg px-3 py-2 font-semibold text-gray-700 hover:bg-gray-100">
+          <Link
+            href="/login"
+            className="rounded-lg px-3 py-2 font-semibold text-gray-700 hover:bg-gray-100"
+          >
             Masuk
           </Link>
           <Link href="/register" className="btn-primary px-3 py-2 text-xs">
